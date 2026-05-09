@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@ewanc26/noise-avatar':
+        specifier: ^0.2.3
+        version: 0.2.3
       better-sqlite3:
         specifier: ^12.9.0
         version: 12.9.0
@@ -65,6 +68,12 @@ packages:
 
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
+
+  '@ewanc26/noise-avatar@0.2.3':
+    resolution: {integrity: sha512-NmXm5llGw7cPrGf2HpdUrKS9pVzDV3I5gyBolYPkn2Xj7cfVv8WxW3PltYz9ohyD3g/ZFZImWVk6qdWqW1DMzA==}
+
+  '@ewanc26/noise@0.1.1':
+    resolution: {integrity: sha512-XeAc0vFrcDHQA7K8xoVVCTYhB2opeBnvGj4s+6SqDS/E3IAP6V32mGf+H2U0JcQHsH4hvpVehYEFt0i1Blnrfg==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -844,6 +853,12 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@ewanc26/noise-avatar@0.2.3':
+    dependencies:
+      '@ewanc26/noise': 0.1.1
+
+  '@ewanc26/noise@0.1.1': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

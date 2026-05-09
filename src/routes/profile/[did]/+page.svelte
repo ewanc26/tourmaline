@@ -10,6 +10,7 @@
 	import { enrichArtist } from '$lib/enrich/musicbrainz';
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
+	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
 	import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
 	import GenreChart from './GenreChart.svelte';
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
@@ -18,6 +19,10 @@
 
 	import { page } from '$app/stores';
 	import { get } from 'svelte/store';
+
+	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
+		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
+	}
 
 	let { data }: { data: { lastfmApiKey: string | null } } = $props();
 	const identifier = decodeURIComponent(get(page).params.did as string);
@@ -311,9 +316,7 @@
 						{#if artist.imageUrl}
 							<img src={artist.imageUrl} alt={artist.name} class="h-8 w-8 rounded" />
 						{:else}
-							<div class="flex h-8 w-8 items-center justify-center rounded bg-gray-700 text-xs text-gray-400">
-								?
-							</div>
+							<canvas use:noiseAvatar={artist.name} class="h-8 w-8 rounded"></canvas>
 						{/if}
 						<span class="flex-1 truncate">{artist.name}</span>
 						<span class="font-mono text-sm text-gray-400">{artist.count.toLocaleString()}</span>

@@ -14,7 +14,9 @@
 		"lint": "prettier --check ."
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": ["better-sqlite3"]
+		"onlyBuiltDependencies": [
+			"better-sqlite3"
+		]
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.1",
@@ -32,6 +34,7 @@
 		"vite": "^8.0.7"
 	},
 	"dependencies": {
+		"@ewanc26/noise-avatar": "^0.2.3",
 		"better-sqlite3": "^12.9.0",
 		"chart.js": "^4.5.1"
 	}
