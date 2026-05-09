@@ -7,7 +7,7 @@
 	let { genres = [] }: { genres: GenreEntry[] } = $props();
 
 	let canvas: HTMLCanvasElement;
-	let chart: Chart | null = $state(null);
+	let chart: Chart | null = null;
 
 	$effect(() => {
 		if (!canvas || genres.length === 0) return;
