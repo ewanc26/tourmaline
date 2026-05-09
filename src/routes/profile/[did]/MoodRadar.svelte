@@ -9,11 +9,11 @@
 	let chart = $state<Chart | null>(null);
 
 	$effect(() => {
-		if (!canvas || Object.keys(mood).length === 0) return;
+		if (!canvas) return;
 
 		const labels = Object.keys(mood);
 		const values = Object.values(mood);
-		const hasNonZero = values.some((v) => v > 0);
+		console.log(`[tourmaline] mood effect: labels=${labels.length}, values=${values.join(',')}, chart=${!!chart}`);
 
 		if (chart) {
 			chart.data.labels = labels;
@@ -21,8 +21,6 @@
 			chart.update();
 			return;
 		}
-
-		if (!hasNonZero) return; // Don't create chart until we have real data
 
 		chart = new Chart(canvas, {
 			type: 'radar',
