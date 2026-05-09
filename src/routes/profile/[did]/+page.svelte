@@ -22,6 +22,11 @@
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
+		return {
+			update(newSeed: string) {
+				renderNoiseAvatar(canvas, newSeed, { displaySize: 32, gridSize: 5 });
+			}
+		};
 	}
 
 	let { data }: { data: { lastfmApiKey: string | null } } = $props();
@@ -310,7 +315,7 @@
 		<div class="mb-8 rounded border border-gray-700 bg-gray-800 p-4">
 			<h2 class="mb-4 text-lg font-semibold">Top Artists</h2>
 			<ol class="space-y-2">
-				{#each profile.topArtists.slice(0, 25) as artist, i}
+				{#each profile.topArtists.slice(0, 25) as artist, i (artist.name)}
 					<li class="flex items-center gap-3">
 						<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
 						{#if artist.imageUrl}
@@ -330,7 +335,7 @@
 			<div class="rounded border border-gray-700 bg-gray-800 p-4">
 				<h2 class="mb-4 text-lg font-semibold">Top Tracks</h2>
 				<ol class="space-y-2">
-					{#each profile.topTracks.slice(0, 25) as track, i}
+					{#each profile.topTracks.slice(0, 25) as track, i (track.name + track.artist)}
 						<li class="flex items-center gap-3">
 							<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
 							<span class="flex-1 truncate">
@@ -346,7 +351,7 @@
 			<div class="rounded border border-gray-700 bg-gray-800 p-4">
 				<h2 class="mb-4 text-lg font-semibold">Top Albums</h2>
 				<ol class="space-y-2">
-					{#each profile.topAlbums.slice(0, 25) as album, i}
+					{#each profile.topAlbums.slice(0, 25) as album, i (album.name + album.artist)}
 						<li class="flex items-center gap-3">
 							<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
 							<span class="flex-1 truncate">
