@@ -12,12 +12,9 @@ async function rateLimitedFetch(url: string): Promise<Response> {
 	if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 	lastRequestTime = Date.now();
 
-	const res = await fetch(url, {
-		headers: {
-			'User-Agent': USER_AGENT,
-			Accept: 'application/json'
-		}
-	});
+	// Route through our server proxy to avoid CORS / forbidden header issues
+	const proxyUrl = `/api/musicbrainz?${encodeURIComponent(url)}`;
+	const res = await fetch(proxyUrl);
 
 	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
 	return res;
