@@ -13,6 +13,7 @@ export interface AggregatedData {
 	scrobblesByHour: number[];
 	scrobblesByDay: number[];
 	scrobblesByHourDay: number[][];
+	dailyScrobbles: Map<string, number>; // YYYY-MM-DD → count
 	serviceOrigins: Map<string, number>;
 }
 
@@ -33,6 +34,7 @@ export class Aggregator {
 	private byHour = new Array(24).fill(0) as number[];
 	private byDay = new Array(7).fill(0) as number[];
 	private byHourDay = Array.from({ length: 7 }, () => new Array(24).fill(0) as number[]);
+	private dailyCounts = new Map<string, number>();
 	private total = 0;
 
 	add(scrobbles: TealScrobble[]): void {
@@ -75,6 +77,9 @@ export class Aggregator {
 			this.byDay[day]++;
 			this.byHourDay[day][hour]++;
 
+			const dateKey = scrobble.playedTime.substring(0, 10); // YYYY-MM-DD
+			this.dailyCounts.set(dateKey, (this.dailyCounts.get(dateKey) ?? 0) + 1);
+
 			if (scrobble.musicServiceBaseDomain) {
 				const domain = scrobble.musicServiceBaseDomain;
 				this.serviceOrigins.set(domain, (this.serviceOrigins.get(domain) ?? 0) + 1);
@@ -109,6 +114,7 @@ export class Aggregator {
 			scrobblesByHour: [...this.byHour],
 			scrobblesByDay: [...this.byDay],
 			scrobblesByHourDay: this.byHourDay.map((d) => [...d]),
+			dailyScrobbles: new Map(this.dailyCounts),
 			serviceOrigins: this.serviceOrigins
 		};
 	}

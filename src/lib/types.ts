@@ -36,6 +36,11 @@ export interface TimelineBucket {
 	count: number;
 }
 
+export interface DailyScrobble {
+	date: string; // YYYY-MM-DD
+	count: number;
+}
+
 export interface EraEntry {
 	decade: string;
 	count: number;
@@ -52,6 +57,7 @@ export interface ListenerProfile {
 	topAlbums: Array<{ name: string; artist: string; count: number }>;
 	genres: GenreEntry[];
 	timeline: TimelineBucket[];
+	dailyScrobbles: DailyScrobble[];
 	era: EraEntry[];
 	diversityScore: number;
 	obscurityIndex: number;

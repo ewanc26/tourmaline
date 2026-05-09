@@ -6,20 +6,23 @@
 	let { mood = {} }: { mood: Record<string, number> } = $props();
 
 	let canvas: HTMLCanvasElement;
-	let chart: Chart | null = $state(null);
+	let chart = $state<Chart | null>(null);
 
 	$effect(() => {
 		if (!canvas || Object.keys(mood).length === 0) return;
 
 		const labels = Object.keys(mood);
 		const values = Object.values(mood);
+		const hasNonZero = values.some((v) => v > 0);
 
 		if (chart) {
 			chart.data.labels = labels;
 			chart.data.datasets[0].data = values;
-			chart.update('none');
+			chart.update();
 			return;
 		}
+
+		if (!hasNonZero) return; // Don't create chart until we have real data
 
 		chart = new Chart(canvas, {
 			type: 'radar',
