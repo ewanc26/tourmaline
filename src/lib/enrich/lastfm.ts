@@ -19,7 +19,12 @@ async function rateLimitedFetch(url: string): Promise<Response> {
 	if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 	lastRequestTime = Date.now();
 
-	const res = await fetch(url);
+	// Route through our server proxy to avoid CORS issues
+	// Only proxy the query string portion (the API params)
+	const apiParams = url.split('?')[1] ?? '';
+	const proxyUrl = `/api/lastfm?${apiParams}`;
+	const res = await fetch(proxyUrl);
+
 	if (res.status === 429) {
 		await new Promise((r) => setTimeout(r, 5000));
 		return rateLimitedFetch(url);
