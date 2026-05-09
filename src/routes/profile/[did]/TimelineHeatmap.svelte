@@ -3,13 +3,14 @@
 
 	let { dailyScrobbles = [] }: { dailyScrobbles: DailyScrobble[] } = $props();
 
-	const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const days = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+	const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-	// Build a lookup map for quick count access
 	const countMap = $derived(new Map(dailyScrobbles.map((d) => [d.date, d.count])));
 	const maxCount = $derived(Math.max(...dailyScrobbles.map((d) => d.count), 1));
 
-	// Calculate the week grid from the data range
+	// Fixed 365-day grid: 53 columns (weeks), 7 rows (days)
+	// Today is the bottom-right cell. The grid extends back 365 days.
 	interface WeekCell {
 		date: string;
 		count: number;
@@ -17,47 +18,67 @@
 	}
 
 	const weeks = $derived.by(() => {
-		if (dailyScrobbles.length === 0) return [];
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
 
-		const sorted = [...dailyScrobbles].sort((a, b) => a.date.localeCompare(b.date));
-		const firstDate = new Date(sorted[0].date + 'T00:00:00Z');
-		const lastDate = new Date(sorted[sorted.length - 1].date + 'T00:00:00Z');
+		// The last column is the week containing today.
+		// Go back to the Sunday of this week, then back 52 more weeks.
+		const todayDow = today.getDay(); // 0=Sun
+		const thisSunday = new Date(today);
+		thisSunday.setDate(thisSunday.getDate() - todayDow);
 
-		// Start from the Sunday before (or on) the first date
-		const startSunday = new Date(firstDate);
-		startSunday.setUTCDate(startSunday.getUTCDate() - startSunday.getUTCDay());
+		const startSunday = new Date(thisSunday);
+		startSunday.setDate(startSunday.getDate() - 52 * 7);
 
 		const result: WeekCell[][] = [];
 		let current = new Date(startSunday);
-		let currentWeek: WeekCell[] = [];
 
-		while (current <= lastDate || currentWeek.length > 0) {
-			const dateStr = current.toISOString().substring(0, 10);
-			const count = countMap.get(dateStr) ?? 0;
-			currentWeek.push({ date: dateStr, count, month: current.getUTCMonth() });
-
-			if (current.getUTCDay() === 6) {
-				result.push(currentWeek);
-				currentWeek = [];
+		for (let w = 0; w < 53; w++) {
+			const week: WeekCell[] = [];
+			for (let d = 0; d < 7; d++) {
+				if (current > today) {
+					// Future cells — blank
+					week.push({ date: '', count: -1, month: 0 });
+				} else {
+					const dateStr = current.toISOString().substring(0, 10);
+					week.push({
+						date: dateStr,
+						count: countMap.get(dateStr) ?? 0,
+						month: current.getMonth()
+					});
+				}
+				current.setDate(current.getDate() + 1);
 			}
-
-			current.setUTCDate(current.getUTCDate() + 1);
-
-			// Safety: stop after 2 years of weeks
-			if (result.length > 104) break;
-		}
-
-		if (currentWeek.length > 0) {
-			result.push(currentWeek);
+			result.push(week);
 		}
 
 		return result;
 	});
 
-	// Month labels — placed at the first week where a new month starts
-	const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+	// Month labels: placed at the first week where a new month starts
+	const monthLabels = $derived.by(() => {
+		const labels: { weekIndex: number; label: string }[] = [];
+		let lastMonth = -1;
+
+		for (let wi = 0; wi < weeks.length; wi++) {
+			const week = weeks[wi];
+			if (!week || week.length === 0) continue;
+
+			// Check the first non-empty cell's month
+			for (const cell of week) {
+				if (cell.count >= 0 && cell.month !== lastMonth) {
+					labels.push({ weekIndex: wi, label: monthNames[cell.month] });
+					lastMonth = cell.month;
+					break;
+				}
+			}
+		}
+
+		return labels;
+	});
 
 	function cellColour(count: number): string {
+		if (count < 0) return 'bg-transparent'; // future
 		if (count === 0) return 'bg-gray-800';
 		const intensity = count / maxCount;
 		if (intensity > 0.75) return 'bg-green-400';
@@ -67,6 +88,7 @@
 	}
 
 	function formatDate(dateStr: string): string {
+		if (!dateStr) return '';
 		const d = new Date(dateStr + 'T00:00:00Z');
 		return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 	}
@@ -76,15 +98,11 @@
 	<div class="inline-block min-w-full">
 		<!-- Month labels -->
 		<div class="mb-1 flex" style="padding-left: 2rem;">
-			{#each weeks as week, wi}
-				{@const firstInWeek = week[0]}
-				{#if wi === 0 || (firstInWeek && firstInWeek.month !== weeks[wi - 1]?.[0]?.month)}
-					<div class="text-xs text-gray-400" style="width: 1rem; min-width: 1rem;">
-						{monthNames[firstInWeek?.month ?? 0]}
-					</div>
-				{:else}
-					<div style="width: 1rem; min-width: 1rem;"></div>
-				{/if}
+			{#each weeks as _, wi}
+				{@const label = monthLabels.find((l) => l.weekIndex === wi)}
+				<div class="text-xs text-gray-400" style="width: 1rem; min-width: 1rem;">
+					{label?.label ?? ''}
+				</div>
 			{/each}
 		</div>
 
@@ -92,11 +110,9 @@
 		<div class="flex gap-0">
 			<!-- Day labels -->
 			<div class="mr-1 flex flex-col" style="gap: 2px;">
-				{#each days as day, di}
+				{#each days as day}
 					<div class="flex h-4 items-center text-xs text-gray-400">
-						{#if di % 2 === 1}
-							{day}
-						{/if}
+						{day}
 					</div>
 				{/each}
 			</div>
@@ -108,7 +124,7 @@
 						{#each week as cell}
 							<div
 								class="h-4 w-4 rounded-sm {cellColour(cell.count)}"
-								title="{formatDate(cell.date)} — {cell.count} scrobble{cell.count !== 1 ? 's' : ''}"
+								title={cell.date ? "{formatDate(cell.date)} — {cell.count} scrobble{cell.count !== 1 ? 's' : ''}" : ''}
 							></div>
 						{/each}
 					</div>
