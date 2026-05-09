@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolveIdentifier, fetchScrobblesBatched } from '$lib/atproto/resolve';
 	import { Aggregator } from '$lib/analysis/aggregator';
 	import { buildGenreProfile } from '$lib/analysis/genres';
@@ -110,13 +110,14 @@
 			profile = emptyProfile(did, handle);
 			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${identity.pdsUrl}`);
 
-			// 2. Fetch scrobbles — update profile after each page
+			// 2. Fetch scrobbles — update profile and flush DOM after each page
 			phase = 'fetching';
 			const fetchStart = performance.now();
-			await fetchScrobblesBatched(identity.pdsUrl, did, (batch, totalSoFar) => {
+			await fetchScrobblesBatched(identity.pdsUrl, did, async (batch, totalSoFar) => {
 				aggregator.add(batch);
 				loaded = totalSoFar;
 				updateProfile(aggregator.snapshot());
+				await tick();
 			});
 			console.log(`[tourmaline] fetched ${loaded} scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 
@@ -192,6 +193,7 @@
 
 				enrichProgress.current = i + 1;
 				updateProfile(aggregator.snapshot());
+				await tick();
 			}
 
 			phase = 'complete';
