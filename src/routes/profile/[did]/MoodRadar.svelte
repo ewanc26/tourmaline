@@ -13,7 +13,6 @@
 
 		const labels = Object.keys(mood);
 		const values = Object.values(mood);
-		console.log(`[tourmaline] mood effect: labels=${labels.length}, values=${values.join(',')}, chart=${!!chart}`);
 
 		if (chart) {
 			chart.data.labels = labels;

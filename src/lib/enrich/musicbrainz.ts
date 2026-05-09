@@ -1,19 +1,18 @@
 import { getCached, setCache } from './cache';
 import type { ArtistInfo } from '$lib/types';
 
-const BASE_URL = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'Tourmaline/0.1.0 (https://github.com/ewanc26/tourmaline)';
 
 let lastRequestTime = 0;
 
-async function rateLimitedFetch(url: string): Promise<Response> {
+async function rateLimitedFetch(path: string): Promise<Response> {
 	const now = Date.now();
 	const wait = Math.max(0, 1100 - (now - lastRequestTime));
 	if (wait > 0) await new Promise((r) => setTimeout(r, wait));
 	lastRequestTime = Date.now();
 
 	// Route through our server proxy to avoid CORS / forbidden header issues
-	const proxyUrl = `/api/musicbrainz?${encodeURIComponent(url)}`;
+	const proxyUrl = `/api/musicbrainz${path}`;
 	const res = await fetch(proxyUrl);
 
 	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
@@ -45,8 +44,8 @@ export async function searchArtist(name: string): Promise<string | null> {
 	const cached = getCached<string>(cacheKey);
 	if (cached !== null) return cached;
 
-	const url = `${BASE_URL}/artist?query=artist:${encodeURIComponent(name)}&limit=1&fmt=json`;
-	const res = await rateLimitedFetch(url);
+	const path = `/artist?query=artist:${encodeURIComponent(name)}&limit=1&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
+	const res = await rateLimitedFetch(path);
 	const data: MBSearchResult = await res.json();
 
 	const match = data.artists?.[0]?.id ?? null;
@@ -59,8 +58,8 @@ export async function getArtistInfo(mbId: string): Promise<ArtistInfo | null> {
 	const cached = getCached<ArtistInfo>(cacheKey);
 	if (cached) return cached;
 
-	const url = `${BASE_URL}/artist/${mbId}?inc=tags+genres+ratings&fmt=json`;
-	const res = await rateLimitedFetch(url);
+	const path = `/artist/${mbId}?inc=tags+genres+ratings&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
+	const res = await rateLimitedFetch(path);
 	const data: MBArtist = await res.json();
 
 	const info: ArtistInfo = {
@@ -82,8 +81,8 @@ export async function getReleaseGroupDecade(mbId: string): Promise<string | null
 	const cached = getCached<string>(cacheKey);
 	if (cached !== null) return cached;
 
-	const url = `${BASE_URL}/release-group/${mbId}?inc=&fmt=json`;
-	const res = await rateLimitedFetch(url);
+	const path = `/release-group/${mbId}?inc=&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
+	const res = await rateLimitedFetch(path);
 	const data: MBReleaseGroup = await res.json();
 
 	const date = data['first-release-date'];
