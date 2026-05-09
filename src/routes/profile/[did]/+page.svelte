@@ -40,7 +40,67 @@
 
 	/** Yield to the browser so it can paint before we continue. */
 	function yieldFrame(): Promise<void> {
-		return new Promise((resolve) => requestAnimationFrame(resolve));
+		return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+	}
+
+	/** Enrich a single artist with MusicBrainz, Last.fm, and Deezer data. */
+	async function enrichOneArtist(name: string, i: number, total: number): Promise<void> {
+		// MusicBrainz
+		try {
+			const info = await enrichArtist(name);
+			if (info) {
+				artistInfos.set(name, info);
+				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz (genres: ${info.genres.length}, tags: ${info.tags.length})`);
+			} else {
+				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz: no match`);
+			}
+		} catch (e) {
+			console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz failed:`, e);
+		}
+
+		// Last.fm
+		try {
+			const lfmData = await enrichWithLastfm(name);
+			if (lfmData) {
+				const existing = artistInfos.get(name);
+				if (existing) {
+					artistInfos.set(name, { ...existing, ...lfmData });
+				} else {
+					artistInfos.set(name, {
+						name,
+						genres: [],
+						tags: lfmData.tags ?? [],
+						similar: lfmData.similar ?? [],
+						listenerCount: lfmData.listenerCount,
+						playCount: lfmData.playCount,
+						imageUrl: lfmData.imageUrl
+					});
+				}
+				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Last.fm (listeners: ${lfmData.listenerCount ?? '?'}, image: ${lfmData.imageUrl ? 'yes' : 'no'})`);
+			}
+		} catch (e) {
+			console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → Last.fm failed:`, e);
+		}
+
+		// Deezer image fallback
+		const existing = artistInfos.get(name);
+		if (!existing?.imageUrl) {
+			try {
+				const imageUrl = await getArtistImage(name);
+				if (imageUrl) {
+					if (existing) {
+						artistInfos.set(name, { ...existing, imageUrl });
+					} else {
+						artistInfos.set(name, { name, genres: [], tags: [], similar: [], imageUrl });
+					}
+					console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer image: ${imageUrl}`);
+				} else {
+					console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer: no image`);
+				}
+			} catch (e) {
+				console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer failed:`, e);
+			}
+		}
 	}
 
 	function emptyProfile(did: string, handle?: string): ListenerProfile {
@@ -115,88 +175,41 @@
 			profile = emptyProfile(did, handle);
 			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${identity.pdsUrl}`);
 
-			// 2. Fetch scrobbles — update profile and flush DOM after each page
+			// 2. Fetch scrobbles — enrich top artists progressively as they appear
 			phase = 'fetching';
 			const fetchStart = performance.now();
+			const enrichedNames = new Set<string>();
 			await fetchScrobblesBatched(identity.pdsUrl, did, async (batch, totalSoFar) => {
 				aggregator.add(batch);
 				loaded = totalSoFar;
 				updateProfile(aggregator.snapshot());
-				await yieldFrame();
+
+				// Start enriching any new top artists that appeared in this batch
+				const topArtists = aggregator.snapshot().topArtists;
+				enrichProgress = { current: enrichedNames.size, total: topArtists.length };
+				for (const { name } of topArtists) {
+					if (enrichedNames.has(name)) continue;
+					enrichedNames.add(name);
+					await enrichOneArtist(name, enrichedNames.size - 1, topArtists.length);
+					enrichProgress.current = enrichedNames.size;
+					updateProfile(aggregator.snapshot());
+					await yieldFrame();
+				}
 			});
 			console.log(`[tourmaline] fetched ${loaded} scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 
-			// 3. Enrich artists — update profile after each artist
+			// 3. Enrich any remaining top artists not yet processed
+			// (top artists list may have shifted as more scrobbles arrived)
 			phase = 'enriching';
-			const topArtists = aggregator.snapshot().topArtists;
-			enrichProgress = { current: 0, total: topArtists.length };
-			console.log(`[tourmaline] enriching ${topArtists.length} artists`);
-
-			for (let i = 0; i < topArtists.length; i++) {
-				const { name } = topArtists[i];
-				if (artistInfos.has(name)) {
-					enrichProgress.current = i + 1;
-					continue;
-				}
-
-				// MusicBrainz
-				try {
-					const info = await enrichArtist(name);
-					if (info) {
-						artistInfos.set(name, info);
-						console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → MusicBrainz (genres: ${info.genres.length}, tags: ${info.tags.length})`);
-					} else {
-						console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → MusicBrainz: no match`);
-					}
-				} catch (e) {
-					console.warn(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → MusicBrainz failed:`, e);
-				}
-
-				// Last.fm
-				try {
-					const lfmData = await enrichWithLastfm(name);
-					if (lfmData) {
-						const existing = artistInfos.get(name);
-						if (existing) {
-							artistInfos.set(name, { ...existing, ...lfmData });
-						} else {
-							artistInfos.set(name, {
-								name,
-								genres: [],
-								tags: lfmData.tags ?? [],
-								similar: lfmData.similar ?? [],
-								listenerCount: lfmData.listenerCount,
-								playCount: lfmData.playCount,
-								imageUrl: lfmData.imageUrl
-							});
-						}
-						console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Last.fm (listeners: ${lfmData.listenerCount ?? '?'}, image: ${lfmData.imageUrl ? 'yes' : 'no'})`);
-					}
-				} catch (e) {
-					console.warn(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Last.fm failed:`, e);
-				}
-
-				// Deezer image fallback
-				const existing = artistInfos.get(name);
-				if (!existing?.imageUrl) {
-					try {
-						const imageUrl = await getArtistImage(name);
-						if (imageUrl) {
-							if (existing) {
-								artistInfos.set(name, { ...existing, imageUrl });
-							} else {
-								artistInfos.set(name, { name, genres: [], tags: [], similar: [], imageUrl });
-							}
-							console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Deezer image: ${imageUrl}`);
-						} else {
-							console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Deezer: no image`);
-						}
-					} catch (e) {
-						console.warn(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Deezer failed:`, e);
-					}
-				}
-
-				enrichProgress.current = i + 1;
+			const finalTop = aggregator.snapshot().topArtists;
+			enrichProgress = { current: enrichedNames.size, total: finalTop.length };
+			console.log(`[tourmaline] enriching remaining artists (${enrichedNames.size}/${finalTop.length} already done)`);
+			for (let i = 0; i < finalTop.length; i++) {
+				const { name } = finalTop[i];
+				if (enrichedNames.has(name)) continue;
+				enrichedNames.add(name);
+				await enrichOneArtist(name, i, finalTop.length);
+				enrichProgress.current = enrichedNames.size;
 				updateProfile(aggregator.snapshot());
 				await yieldFrame();
 			}
