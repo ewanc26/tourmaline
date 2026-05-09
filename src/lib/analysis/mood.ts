@@ -224,6 +224,10 @@ export function buildMoodProfile(
 		if (!info) continue;
 
 		const allTags = [...info.tags, ...info.genres].map((t) => t.toLowerCase());
+		const matchedTags = allTags.filter((t) => GENRE_MOOD_MAP[t]);
+		if (matchedTags.length > 0) {
+			console.log(`[tourmaline] mood: ${name} → tags=${allTags.join(',')}, matched=${matchedTags.join(',')}`);
+		}
 
 		for (const tag of allTags) {
 			const mapping = GENRE_MOOD_MAP[tag];
