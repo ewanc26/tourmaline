@@ -16,13 +16,18 @@
 	import MoodRadar from './MoodRadar.svelte';
 	import EraBarChart from './EraBarChart.svelte';
 
-	let { url, data }: { url: URL; data: { lastfmApiKey: string | null } } = $props();
-	const identifier = decodeURIComponent(url.pathname.split('/').pop() ?? '');
+	import { page } from '$app/stores';
+	import { get } from 'svelte/store';
+
+	let { data }: { data: { lastfmApiKey: string | null } } = $props();
+	const identifier = decodeURIComponent(get(page).params.did as string);
 
 	// Expose Last.fm API key to client-side enrichment
-	if (data.lastfmApiKey && typeof window !== 'undefined') {
-		(window as unknown as Record<string, string>).__LASTFM_API_KEY = data.lastfmApiKey;
-	}
+	onMount(() => {
+		if (data.lastfmApiKey) {
+			(window as unknown as Record<string, string>).__LASTFM_API_KEY = data.lastfmApiKey;
+		}
+	});
 
 	let phase = $state<'idle' | 'resolving' | 'fetching' | 'enriching' | 'complete' | 'error'>('idle');
 	let did = $state('');
