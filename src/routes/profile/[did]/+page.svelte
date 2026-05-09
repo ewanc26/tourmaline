@@ -88,27 +88,33 @@
 
 	onMount(async () => {
 		const aggregator = new Aggregator();
+		const t0 = performance.now();
 
 		try {
 			// 1. Resolve identity
 			phase = 'resolving';
+			console.log(`[tourmaline] resolving identity: ${identifier}`);
 			const identity = await resolveIdentifier(identifier);
 			did = identity.did;
 			handle = identity.handle;
 			profile = emptyProfile(did, handle);
+			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${identity.pdsUrl}`);
 
 			// 2. Fetch scrobbles — update profile after each page
 			phase = 'fetching';
+			const fetchStart = performance.now();
 			await fetchScrobblesBatched(identity.pdsUrl, did, (batch, totalSoFar) => {
 				aggregator.add(batch);
 				loaded = totalSoFar;
 				updateProfile(aggregator.snapshot());
 			});
+			console.log(`[tourmaline] fetched ${loaded} scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 
 			// 3. Enrich artists — update profile after each artist
 			phase = 'enriching';
 			const topArtists = aggregator.snapshot().topArtists;
 			enrichProgress = { current: 0, total: topArtists.length };
+			console.log(`[tourmaline] enriching ${topArtists.length} artists`);
 
 			for (let i = 0; i < topArtists.length; i++) {
 				const { name } = topArtists[i];
@@ -120,8 +126,15 @@
 				// MusicBrainz
 				try {
 					const info = await enrichArtist(name);
-					if (info) artistInfos.set(name, info);
-				} catch { /* continue */ }
+					if (info) {
+						artistInfos.set(name, info);
+						console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → MusicBrainz (genres: ${info.genres.length}, tags: ${info.tags.length})`);
+					} else {
+						console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → MusicBrainz: no match`);
+					}
+				} catch (e) {
+					console.warn(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → MusicBrainz failed:`, e);
+				}
 
 				// Last.fm
 				try {
@@ -141,8 +154,11 @@
 								imageUrl: lfmData.imageUrl
 							});
 						}
+						console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Last.fm (listeners: ${lfmData.listenerCount ?? '?'}, image: ${lfmData.imageUrl ? 'yes' : 'no'})`);
 					}
-				} catch { /* continue */ }
+				} catch (e) {
+					console.warn(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Last.fm failed:`, e);
+				}
 
 				// Deezer image fallback
 				const existing = artistInfos.get(name);
@@ -155,8 +171,13 @@
 							} else {
 								artistInfos.set(name, { name, genres: [], tags: [], similar: [], imageUrl });
 							}
+							console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Deezer image: ${imageUrl}`);
+						} else {
+							console.log(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Deezer: no image`);
 						}
-					} catch { /* continue */ }
+					} catch (e) {
+						console.warn(`[tourmaline] [${i + 1}/${topArtists.length}] ${name} → Deezer failed:`, e);
+					}
 				}
 
 				enrichProgress.current = i + 1;
@@ -164,9 +185,11 @@
 			}
 
 			phase = 'complete';
+			console.log(`[tourmaline] complete in ${((performance.now() - t0) / 1000).toFixed(1)}s — ${loaded} scrobbles, ${artistInfos.size} artists enriched`);
 		} catch (e) {
 			phase = 'error';
 			error = e instanceof Error ? e.message : String(e);
+			console.error(`[tourmaline] error:`, e);
 		}
 	});
 </script>
