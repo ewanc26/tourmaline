@@ -1,58 +1,60 @@
 import { getCached, setCache } from './cache';
 
-const BASE_URL = 'https://api.deezer.com';
-
 interface DeezerArtist {
-	id: number;
 	name: string;
-	picture_medium?: string;
-	nb_fan?: number;
-	type: 'artist';
+	imageUrl: string | null;
+	genres: string[];
 }
 
-interface DeezerSearchResult {
-	data: Array<DeezerArtist>;
-}
+const isBrowser = typeof window !== 'undefined';
 
-interface DeezerGenre {
-	id: number;
-	name: string;
-	picture?: string;
-}
-
-export async function searchArtist(name: string): Promise<DeezerArtist | null> {
-	const cacheKey = `dz:search:${name.toLowerCase()}`;
-	const cached = getCached<DeezerArtist>(cacheKey);
+export async function getArtistImage(name: string): Promise<string | null> {
+	const cacheKey = `dz:image:${name.toLowerCase()}`;
+	const cached = getCached<string | null>(cacheKey);
 	if (cached !== null) return cached;
 
-	const url = `${BASE_URL}/search/artist?q=${encodeURIComponent(name)}`;
+	if (isBrowser) {
+		// Use SvelteKit API proxy to avoid CORS
+		const res = await fetch(`/api/deezer/artist?q=${encodeURIComponent(name)}`);
+		if (!res.ok) return null;
+		const data: DeezerArtist = await res.json();
+		const imageUrl = data.imageUrl;
+		setCache(cacheKey, 'deezer', imageUrl);
+		return imageUrl;
+	}
+
+	// Server-side: call Deezer directly
+	const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}`;
 	const res = await fetch(url);
-	if (!res.ok) throw new Error(`Deezer API error: ${res.status}`);
+	if (!res.ok) return null;
 
-	const data: DeezerSearchResult = await res.json();
-	const match = data.data?.[0] ?? null;
-
-	setCache(cacheKey, 'deezer', match);
-	return match;
+	const data = (await res.json()) as { data?: Array<{ picture_medium?: string }> };
+	const imageUrl = data.data?.[0]?.picture_medium ?? null;
+	setCache(cacheKey, 'deezer', imageUrl);
+	return imageUrl;
 }
 
-export async function getArtistGenres(deezerId: number): Promise<string[]> {
-	const cacheKey = `dz:genres:${deezerId}`;
-	const cached = getCached<string[]>(cacheKey);
-	if (cached) return cached;
+export async function getArtistGenres(name: string): Promise<string[]> {
+	// Genres via Deezer are also blocked by CORS in the browser.
+	// This is a secondary source — MusicBrainz genres are preferred.
+	if (isBrowser) {
+		const res = await fetch(`/api/deezer/artist?q=${encodeURIComponent(name)}`);
+		if (!res.ok) return [];
+		const data: DeezerArtist = await res.json();
+		return data.genres ?? [];
+	}
 
-	const url = `${BASE_URL}/artist/${deezerId}`;
+	const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}`;
 	const res = await fetch(url);
 	if (!res.ok) return [];
 
-	const data = (await res.json()) as DeezerArtist & { genres?: { data: DeezerGenre[] } };
-	const genres = data.genres?.data?.map((g) => g.name) ?? [];
+	const data = (await res.json()) as {
+		data?: Array<{ id: number }>;
+	};
+	if (!data.data?.[0]) return [];
 
-	setCache(cacheKey, 'deezer', genres);
-	return genres;
-}
-
-export async function getArtistImage(name: string): Promise<string | null> {
-	const artist = await searchArtist(name);
-	return artist?.picture_medium ?? null;
+	const detailRes = await fetch(`https://api.deezer.com/artist/${data.data[0].id}`);
+	if (!detailRes.ok) return [];
+	const detail = (await detailRes.json()) as { genres?: { data: Array<{ name: string }> } };
+	return detail.genres?.data?.map((g) => g.name) ?? [];
 }

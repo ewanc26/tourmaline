@@ -146,11 +146,15 @@
 
 				// Deezer image fallback
 				const existing = artistInfos.get(name);
-				if (existing && !existing.imageUrl) {
+				if (!existing?.imageUrl) {
 					try {
 						const imageUrl = await getArtistImage(name);
 						if (imageUrl) {
-							artistInfos.set(name, { ...existing, imageUrl });
+							if (existing) {
+								artistInfos.set(name, { ...existing, imageUrl });
+							} else {
+								artistInfos.set(name, { name, genres: [], tags: [], similar: [], imageUrl });
+							}
 						}
 					} catch { /* continue */ }
 				}
