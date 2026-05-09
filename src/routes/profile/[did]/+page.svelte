@@ -64,8 +64,6 @@
 		const diversity = diversityScore(data);
 		const obscurity = calculateObscurity(data, artistInfos);
 		const mood = buildMoodProfile(data, artistInfos);
-		const moodSum = Object.values(mood).reduce((a, b) => a + b, 0);
-		console.log(`[tourmaline] updateProfile: ${artistInfos.size} artists enriched, mood sum=${moodSum}, values=${Object.values(mood).join(',')}`);
 
 		profile = {
 			did,
