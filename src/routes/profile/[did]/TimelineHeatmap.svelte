@@ -109,7 +109,7 @@
 		<!-- Day rows -->
 		<div class="flex gap-0">
 			<!-- Day labels -->
-			<div class="mr-1 flex flex-col" style="gap: 2px;">
+			<div class="mr-2 flex flex-col" style="gap: 3px;">
 				{#each days as day}
 					<div class="flex h-4 items-center text-xs text-gray-400">
 						{day}
@@ -118,9 +118,9 @@
 			</div>
 
 			<!-- Cell grid -->
-			<div class="flex" style="gap: 2px;">
+			<div class="flex" style="gap: 3px;">
 				{#each weeks as week}
-					<div class="flex flex-col" style="gap: 2px;">
+					<div class="flex flex-col" style="gap: 3px;">
 						{#each week as cell}
 							<div
 								class="h-4 w-4 rounded-sm {cellColour(cell.count)}"
