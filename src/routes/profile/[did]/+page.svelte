@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
 	import { resolveIdentifier, fetchScrobblesBatched } from '$lib/atproto/resolve';
 	import { Aggregator } from '$lib/analysis/aggregator';
 	import { buildGenreProfile } from '$lib/analysis/genres';
@@ -37,6 +37,11 @@
 	let profile = $state<ListenerProfile | null>(null);
 
 	const artistInfos = new Map<string, ArtistInfo>();
+
+	/** Yield to the browser so it can paint before we continue. */
+	function yieldFrame(): Promise<void> {
+		return new Promise((resolve) => requestAnimationFrame(resolve));
+	}
 
 	function emptyProfile(did: string, handle?: string): ListenerProfile {
 		return {
@@ -117,7 +122,7 @@
 				aggregator.add(batch);
 				loaded = totalSoFar;
 				updateProfile(aggregator.snapshot());
-				await tick();
+				await yieldFrame();
 			});
 			console.log(`[tourmaline] fetched ${loaded} scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 
@@ -193,7 +198,7 @@
 
 				enrichProgress.current = i + 1;
 				updateProfile(aggregator.snapshot());
-				await tick();
+				await yieldFrame();
 			}
 
 			phase = 'complete';
