@@ -74,8 +74,8 @@ function parseScrobble(v: Record<string, unknown>): TealScrobble {
 	return {
 		trackName: v.trackName as string,
 		artists: (v.artists as Array<Record<string, unknown>>)?.map((a) => ({
-			name: a.name as string,
-			mbId: a.mbId as string | undefined
+			name: (a.artistName ?? a.name) as string,
+			mbId: (a.artistMbId ?? a.mbId) as string | undefined
 		})) ?? [],
 		releaseName: v.releaseName as string | undefined,
 		trackMbId: v.trackMbId as string | undefined,
