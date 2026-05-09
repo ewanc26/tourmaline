@@ -11,14 +11,11 @@
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
 	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
-	import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
+	import type { ArtistInfo, ListenerProfile } from '$lib/types';
 	import GenreChart from './GenreChart.svelte';
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
 	import MoodRadar from './MoodRadar.svelte';
 	import EraBarChart from './EraBarChart.svelte';
-
-	import { page } from '$app/stores';
-	import { get } from 'svelte/store';
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
@@ -30,14 +27,6 @@
 	}
 
 	let { data }: { data: { lastfmApiKey: string | null } } = $props();
-	const identifier = decodeURIComponent(get(page).params.did as string);
-
-	// Expose Last.fm API key to client-side enrichment
-	onMount(() => {
-		if (data.lastfmApiKey) {
-			(window as unknown as Record<string, string>).__LASTFM_API_KEY = data.lastfmApiKey;
-		}
-	});
 
 	let phase = $state<'idle' | 'resolving' | 'fetching' | 'enriching' | 'complete' | 'error'>('idle');
 	let did = $state('');
@@ -97,6 +86,13 @@
 	}
 
 	onMount(async () => {
+		const identifier = decodeURIComponent(window.location.pathname.split('/').pop() ?? '');
+
+		// Expose Last.fm API key to client-side enrichment
+		if (data.lastfmApiKey) {
+			(window as unknown as Record<string, string>).__LASTFM_API_KEY = data.lastfmApiKey;
+		}
+
 		const aggregator = new Aggregator();
 		const t0 = performance.now();
 
@@ -205,15 +201,15 @@
 </script>
 
 <svelte:head>
-	<title>{handle ?? identifier} — Tourmaline</title>
-	<meta name="description" content="Listening profile for {handle ?? identifier}" />
+	<title>{handle ?? did} — Tourmaline</title>
+	<meta name="description" content="Listening profile for {handle ?? did}" />
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-4 py-8">
 	<header class="mb-8">
 		<a href="/" class="text-sm text-gray-400 hover:text-white">&larr; Back</a>
 		<h1 class="mt-2 text-2xl font-bold">
-			{handle ?? identifier}
+			{handle ?? did}
 		</h1>
 		{#if did}
 			<p class="mt-1 font-mono text-xs text-gray-500">{did}</p>
@@ -335,7 +331,7 @@
 			<div class="rounded border border-gray-700 bg-gray-800 p-4">
 				<h2 class="mb-4 text-lg font-semibold">Top Tracks</h2>
 				<ol class="space-y-2">
-					{#each profile.topTracks.slice(0, 25) as track, i (track.name + track.artist)}
+					{#each profile.topTracks.slice(0, 25) as track, i (i)}
 						<li class="flex items-center gap-3">
 							<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
 							<span class="flex-1 truncate">
@@ -351,7 +347,7 @@
 			<div class="rounded border border-gray-700 bg-gray-800 p-4">
 				<h2 class="mb-4 text-lg font-semibold">Top Albums</h2>
 				<ol class="space-y-2">
-					{#each profile.topAlbums.slice(0, 25) as album, i (album.name + album.artist)}
+					{#each profile.topAlbums.slice(0, 25) as album, i (i)}
 						<li class="flex items-center gap-3">
 							<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
 							<span class="flex-1 truncate">
