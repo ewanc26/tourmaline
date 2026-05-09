@@ -50,6 +50,7 @@
 			topAlbums: [],
 			genres: [],
 			timeline: [],
+			dailyScrobbles: [],
 			era: [],
 			diversityScore: 0,
 			obscurityIndex: 50,
@@ -78,6 +79,9 @@
 			topAlbums: data.topAlbums,
 			genres,
 			timeline,
+			dailyScrobbles: [...data.dailyScrobbles.entries()]
+				.map(([date, count]) => ({ date, count }))
+				.sort((a, b) => a.date.localeCompare(b.date)),
 			era: [],
 			diversityScore: diversity,
 			obscurityIndex: obscurity,
@@ -295,7 +299,7 @@
 		{#if profile.timeline.length > 0}
 			<div class="mb-8 rounded border border-gray-700 bg-gray-800 p-4">
 				<h2 class="mb-4 text-lg font-semibold">Listening Timeline</h2>
-				<TimelineHeatmap timeline={profile.timeline} />
+				<TimelineHeatmap dailyScrobbles={profile.dailyScrobbles} />
 			</div>
 		{/if}
 
