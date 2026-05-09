@@ -5,10 +5,12 @@ const BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
 
 let lastRequestTime = 0;
 
-function getApiKey(): string {
-	const key = process.env.LASTFM_API_KEY;
-	if (!key) throw new Error('LASTFM_API_KEY environment variable is not set');
-	return key;
+// Last.fm API key. Set via env var on server, or window.__LASTFM_API_KEY on client.
+function getApiKey(): string | null {
+	if (typeof window !== 'undefined') {
+		return (window as unknown as Record<string, string>).__LASTFM_API_KEY ?? null;
+	}
+	return process.env.LASTFM_API_KEY ?? null;
 }
 
 async function rateLimitedFetch(url: string): Promise<Response> {
@@ -37,6 +39,9 @@ interface LFMArtist {
 }
 
 export async function getArtistInfo(name: string): Promise<ArtistInfo | null> {
+	const apiKey = getApiKey();
+	if (!apiKey) return null;
+
 	const cacheKey = `lfm:artist:${name.toLowerCase()}`;
 	const cached = getCached<ArtistInfo>(cacheKey);
 	if (cached) return cached;
@@ -44,9 +49,9 @@ export async function getArtistInfo(name: string): Promise<ArtistInfo | null> {
 	const params = new URLSearchParams({
 		method: 'artist.getinfo',
 		artist: name,
-		api_key: getApiKey(),
+		api_key: apiKey,
 		format: 'json',
-	 autocorrect: '1'
+		autocorrect: '1'
 	});
 
 	const res = await rateLimitedFetch(`${BASE_URL}?${params}`);

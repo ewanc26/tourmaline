@@ -3,7 +3,7 @@
 
 	Chart.register(...registerables);
 
-	let { mood }: { mood: Record<string, number> } = $props();
+	let { mood = {} }: { mood: Record<string, number> } = $props();
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = $state(null);
@@ -14,7 +14,12 @@
 		const labels = Object.keys(mood);
 		const values = Object.values(mood);
 
-		if (chart) chart.destroy();
+		if (chart) {
+			chart.data.labels = labels;
+			chart.data.datasets[0].data = values;
+			chart.update('none');
+			return;
+		}
 
 		chart = new Chart(canvas, {
 			type: 'radar',
@@ -32,6 +37,7 @@
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
+				animation: false,
 				plugins: {
 					legend: { display: false }
 				},

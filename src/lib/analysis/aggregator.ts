@@ -21,90 +21,102 @@ const TRACK_KEY = (s: TealScrobble) =>
 const ALBUM_KEY = (s: TealScrobble) =>
 	s.releaseName ? `${s.releaseName}|||${s.artists.map((a) => a.name).join(',')}` : null;
 
-export function aggregate(scrobbles: TealScrobble[]): AggregatedData {
-	const artistCounts = new Map<string, number>();
-	const trackCounts = new Map<string, { name: string; artist: string; count: number }>();
-	const albumCounts = new Map<string, { name: string; artist: string; count: number }>();
-	const serviceOrigins = new Map<string, number>();
+/**
+ * Incremental aggregator. Maintains running totals so it can be updated
+ * as each batch of scrobbles arrives without reprocessing everything.
+ */
+export class Aggregator {
+	private artistCounts = new Map<string, number>();
+	private trackCounts = new Map<string, { name: string; artist: string; count: number }>();
+	private albumCounts = new Map<string, { name: string; artist: string; count: number }>();
+	private serviceOrigins = new Map<string, number>();
+	private byHour = new Array(24).fill(0) as number[];
+	private byDay = new Array(7).fill(0) as number[];
+	private byHourDay = Array.from({ length: 7 }, () => new Array(24).fill(0) as number[]);
+	private total = 0;
 
-	const byHour = new Array(24).fill(0);
-	const byDay = new Array(7).fill(0);
-	const byHourDay = Array.from({ length: 7 }, () => new Array(24).fill(0));
+	add(scrobbles: TealScrobble[]): void {
+		for (const scrobble of scrobbles) {
+			this.total++;
 
-	for (const scrobble of scrobbles) {
-		// Artist counts
-		const artistName = scrobble.artists[0]?.name ?? 'Unknown';
-		artistCounts.set(artistName, (artistCounts.get(artistName) ?? 0) + 1);
+			const artistName = scrobble.artists[0]?.name ?? 'Unknown';
+			this.artistCounts.set(artistName, (this.artistCounts.get(artistName) ?? 0) + 1);
 
-		// Track counts
-		const trackKey = TRACK_KEY(scrobble);
-		const existing = trackCounts.get(trackKey);
-		if (existing) {
-			existing.count++;
-		} else {
-			trackCounts.set(trackKey, {
-				name: scrobble.trackName,
-				artist: artistName,
-				count: 1
-			});
-		}
-
-		// Album counts
-		const albumKey = ALBUM_KEY(scrobble);
-		if (albumKey) {
-			const albumExisting = albumCounts.get(albumKey);
-			if (albumExisting) {
-				albumExisting.count++;
+			const trackKey = TRACK_KEY(scrobble);
+			const existing = this.trackCounts.get(trackKey);
+			if (existing) {
+				existing.count++;
 			} else {
-				albumCounts.set(albumKey, {
-					name: scrobble.releaseName!,
+				this.trackCounts.set(trackKey, {
+					name: scrobble.trackName,
 					artist: artistName,
 					count: 1
 				});
 			}
-		}
 
-		// Timeline
-		const date = new Date(scrobble.playedTime);
-		const hour = date.getHours();
-		const day = date.getDay();
-		byHour[hour]++;
-		byDay[day]++;
-		byHourDay[day][hour]++;
+			const albumKey = ALBUM_KEY(scrobble);
+			if (albumKey) {
+				const albumExisting = this.albumCounts.get(albumKey);
+				if (albumExisting) {
+					albumExisting.count++;
+				} else {
+					this.albumCounts.set(albumKey, {
+						name: scrobble.releaseName!,
+						artist: artistName,
+						count: 1
+					});
+				}
+			}
 
-		// Service origins
-		if (scrobble.musicServiceBaseDomain) {
-			const domain = scrobble.musicServiceBaseDomain;
-			serviceOrigins.set(domain, (serviceOrigins.get(domain) ?? 0) + 1);
+			const date = new Date(scrobble.playedTime);
+			const hour = date.getHours();
+			const day = date.getDay();
+			this.byHour[hour]++;
+			this.byDay[day]++;
+			this.byHourDay[day][hour]++;
+
+			if (scrobble.musicServiceBaseDomain) {
+				const domain = scrobble.musicServiceBaseDomain;
+				this.serviceOrigins.set(domain, (this.serviceOrigins.get(domain) ?? 0) + 1);
+			}
 		}
 	}
 
-	const topArtists = [...artistCounts.entries()]
-		.map(([name, count]) => ({ name, count }))
-		.sort((a, b) => b.count - a.count)
-		.slice(0, 50);
+	snapshot(): AggregatedData {
+		const topArtists = [...this.artistCounts.entries()]
+			.map(([name, count]) => ({ name, count }))
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 50);
 
-	const topTracks = [...trackCounts.values()]
-		.sort((a, b) => b.count - a.count)
-		.slice(0, 50);
+		const topTracks = [...this.trackCounts.values()]
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 50);
 
-	const topAlbums = [...albumCounts.values()]
-		.sort((a, b) => b.count - a.count)
-		.slice(0, 50);
+		const topAlbums = [...this.albumCounts.values()]
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 50);
 
-	return {
-		totalScrobbles: scrobbles.length,
-		uniqueArtists: artistCounts.size,
-		uniqueTracks: trackCounts.size,
-		topArtists,
-		topTracks,
-		topAlbums,
-		artistPlayCounts: artistCounts,
-		trackPlayCounts: new Map([...trackCounts.values()].map((t) => [t.name, t.count])),
-		albumPlayCounts: albumCounts,
-		scrobblesByHour: byHour,
-		scrobblesByDay: byDay,
-		scrobblesByHourDay: byHourDay,
-		serviceOrigins
-	};
+		return {
+			totalScrobbles: this.total,
+			uniqueArtists: this.artistCounts.size,
+			uniqueTracks: this.trackCounts.size,
+			topArtists,
+			topTracks,
+			topAlbums,
+			artistPlayCounts: this.artistCounts,
+			trackPlayCounts: new Map([...this.trackCounts.values()].map((t) => [t.name, t.count])),
+			albumPlayCounts: this.albumCounts,
+			scrobblesByHour: [...this.byHour],
+			scrobblesByDay: [...this.byDay],
+			scrobblesByHourDay: this.byHourDay.map((d) => [...d]),
+			serviceOrigins: this.serviceOrigins
+		};
+	}
+}
+
+/** One-shot aggregation for when you have all scrobbles already. */
+export function aggregate(scrobbles: TealScrobble[]): AggregatedData {
+	const agg = new Aggregator();
+	agg.add(scrobbles);
+	return agg.snapshot();
 }

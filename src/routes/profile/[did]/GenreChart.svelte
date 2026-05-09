@@ -4,7 +4,7 @@
 
 	Chart.register(...registerables);
 
-	let { genres }: { genres: GenreEntry[] } = $props();
+	let { genres = [] }: { genres: GenreEntry[] } = $props();
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = $state(null);
@@ -15,7 +15,17 @@
 		const top = genres.slice(0, 12);
 		const maxWeight = top[0]?.weight ?? 1;
 
-		if (chart) chart.destroy();
+		if (chart) {
+			// Update existing chart
+			chart.data.labels = top.map((g) => g.name);
+			chart.data.datasets[0].data = top.map((g) => Math.round((g.weight / maxWeight) * 100));
+			chart.data.datasets[0].backgroundColor = top.map((_, i) => {
+				const hue = (i * 30) % 360;
+				return `hsl(${hue}, 70%, 55%)`;
+			});
+			chart.update('none');
+			return;
+		}
 
 		chart = new Chart(canvas, {
 			type: 'bar',
@@ -35,6 +45,7 @@
 				indexAxis: 'y',
 				responsive: true,
 				maintainAspectRatio: false,
+				animation: false,
 				plugins: {
 					legend: { display: false },
 					tooltip: {

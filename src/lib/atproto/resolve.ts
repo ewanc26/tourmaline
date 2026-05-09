@@ -8,36 +8,30 @@ interface DidDocument {
 	service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
 }
 
-/**
- * Resolve an identifier (DID or handle) to a DID and PDS URL.
- * Uses Slingshot for handle → DID resolution, then PLC/did:web for DID document.
- */
-export async function resolveIdentifier(
-	identifier: string
-): Promise<{ did: string; pdsUrl: string; handle?: string }> {
+export interface IdentityResult {
+	did: string;
+	pdsUrl: string;
+	handle?: string;
+}
+
+export async function resolveIdentifier(identifier: string): Promise<IdentityResult> {
 	let did: string;
 	let handle: string | undefined;
 
-	// If it's already a DID, use it directly
 	if (identifier.startsWith('did:')) {
 		did = identifier;
 	} else {
-		// It's a handle — resolve via Slingshot
 		const res = await fetch(
 			`${SLINGSHOT_URL}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(identifier)}`
 		);
-		if (!res.ok) {
-			throw new Error(`Failed to resolve handle "${identifier}": ${res.status}`);
-		}
+		if (!res.ok) throw new Error(`Failed to resolve handle "${identifier}": ${res.status}`);
 		const data = (await res.json()) as { did: string };
 		did = data.did;
 		handle = identifier;
 	}
 
-	// Resolve DID document to get PDS URL
 	const doc = await resolveDidDocument(did);
 
-	// Extract handle from DID document if we didn't already have it
 	if (!handle) {
 		handle = doc.alsoKnownAs?.find((h) => h.startsWith('at://'))?.replace('at://', '');
 	}
@@ -76,13 +70,41 @@ interface ListRecordsResponse {
 	cursor?: string;
 }
 
-export async function* fetchScrobbles(
+function parseScrobble(v: Record<string, unknown>): TealScrobble {
+	return {
+		trackName: v.trackName as string,
+		artists: (v.artists as Array<Record<string, unknown>>)?.map((a) => ({
+			name: a.name as string,
+			mbId: a.mbId as string | undefined
+		})) ?? [],
+		releaseName: v.releaseName as string | undefined,
+		trackMbId: v.trackMbId as string | undefined,
+		recordingMbId: v.recordingMbId as string | undefined,
+		releaseMbId: v.releaseMbId as string | undefined,
+		duration: v.duration as number | undefined,
+		originUrl: v.originUrl as string | undefined,
+		playedTime: v.playedTime as string,
+		submissionClientAgent: v.submissionClientAgent as string | undefined,
+		musicServiceBaseDomain: v.musicServiceBaseDomain as string | undefined,
+		trackDiscriminant: v.trackDiscriminant as string | undefined,
+		releaseDiscriminant: v.releaseDiscriminant as string | undefined
+	};
+}
+
+/**
+ * Fetch scrobbles page by page, calling onBatch after each page.
+ * Returns the complete list. The onBatch callback receives the newly
+ * fetched scrobbles and the running total so far.
+ */
+export async function fetchScrobblesBatched(
 	pdsUrl: string,
 	did: string,
-	options?: { limit?: number; signal?: AbortSignal }
-): AsyncGenerator<TealScrobble> {
-	const limit = options?.limit ?? 100;
+	onBatch: (batch: TealScrobble[], totalSoFar: number) => void,
+	signal?: AbortSignal
+): Promise<TealScrobble[]> {
+	const limit = 100;
 	let cursor: string | undefined;
+	const allScrobbles: TealScrobble[] = [];
 
 	while (true) {
 		const params = new URLSearchParams({
@@ -93,7 +115,7 @@ export async function* fetchScrobbles(
 		if (cursor) params.set('cursor', cursor);
 
 		const url = `${pdsUrl}/xrpc/com.atproto.repo.listRecords?${params}`;
-		const res = await fetch(url, { signal: options?.signal });
+		const res = await fetch(url, { signal });
 
 		if (!res.ok) {
 			const body = await res.text();
@@ -101,30 +123,21 @@ export async function* fetchScrobbles(
 		}
 
 		const data: ListRecordsResponse = await res.json();
+		const batch: TealScrobble[] = [];
 
 		for (const record of data.records) {
-			const v = record.value;
-			yield {
-				trackName: v.trackName as string,
-				artists: (v.artists as Array<Record<string, unknown>>)?.map((a) => ({
-					name: a.name as string,
-					mbId: a.mbId as string | undefined
-				})) ?? [],
-				releaseName: v.releaseName as string | undefined,
-				trackMbId: v.trackMbId as string | undefined,
-				recordingMbId: v.recordingMbId as string | undefined,
-				releaseMbId: v.releaseMbId as string | undefined,
-				duration: v.duration as number | undefined,
-				originUrl: v.originUrl as string | undefined,
-				playedTime: v.playedTime as string,
-				submissionClientAgent: v.submissionClientAgent as string | undefined,
-				musicServiceBaseDomain: v.musicServiceBaseDomain as string | undefined,
-				trackDiscriminant: v.trackDiscriminant as string | undefined,
-				releaseDiscriminant: v.releaseDiscriminant as string | undefined
-			};
+			const scrobble = parseScrobble(record.value);
+			batch.push(scrobble);
+			allScrobbles.push(scrobble);
+		}
+
+		if (batch.length > 0) {
+			onBatch(batch, allScrobbles.length);
 		}
 
 		cursor = data.cursor;
 		if (!cursor || data.records.length === 0) break;
 	}
+
+	return allScrobbles;
 }

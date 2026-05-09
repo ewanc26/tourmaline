@@ -4,7 +4,7 @@
 
 	Chart.register(...registerables);
 
-	let { era }: { era: EraEntry[] } = $props();
+	let { era = [] }: { era: EraEntry[] } = $props();
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = $state(null);
@@ -12,7 +12,16 @@
 	$effect(() => {
 		if (!canvas || era.length === 0) return;
 
-		if (chart) chart.destroy();
+		if (chart) {
+			chart.data.labels = era.map((e) => e.decade);
+			chart.data.datasets[0].data = era.map((e) => e.count);
+			chart.data.datasets[0].backgroundColor = era.map((_, i) => {
+				const hue = 200 + i * 25;
+				return `hsl(${hue}, 60%, 50%)`;
+			});
+			chart.update('none');
+			return;
+		}
 
 		chart = new Chart(canvas, {
 			type: 'bar',
@@ -31,6 +40,7 @@
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
+				animation: false,
 				plugins: {
 					legend: { display: false }
 				},
