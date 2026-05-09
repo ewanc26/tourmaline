@@ -1,4 +1,4 @@
-import { resolveDid, fetchScrobbles } from '$lib/atproto/resolve';
+import { resolveIdentifier, fetchScrobbles } from '$lib/atproto/resolve';
 import { enrichArtist } from '$lib/enrich/musicbrainz';
 import { enrichWithLastfm } from '$lib/enrich/lastfm';
 import { getArtistImage } from '$lib/enrich/deezer';
@@ -13,14 +13,14 @@ import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
-	const did = decodeURIComponent(params.did);
+	const identifier = decodeURIComponent(params.did);
 
 	setHeaders({
 		'Cache-Control': 'no-cache'
 	});
 
-	// 1. Resolve DID
-	const { pdsUrl, handle } = await resolveDid(did);
+	// 1. Resolve identifier (DID or handle) via Slingshot
+	const { did, pdsUrl, handle } = await resolveIdentifier(identifier);
 
 	// 2. Fetch scrobbles
 	const scrobbles: TealScrobble[] = [];

@@ -1,34 +1,70 @@
 import type { TealScrobble } from '$lib/types';
 
+const SLINGSHOT_URL = 'https://slingshot.microcosm.blue';
+
 interface DidDocument {
 	id: string;
 	alsoKnownAs?: string[];
 	service?: Array<{ id: string; type: string; serviceEndpoint: string }>;
 }
 
-export async function resolveDid(did: string): Promise<{ pdsUrl: string; handle?: string }> {
-	let doc: DidDocument;
+/**
+ * Resolve an identifier (DID or handle) to a DID and PDS URL.
+ * Uses Slingshot for handle → DID resolution, then PLC/did:web for DID document.
+ */
+export async function resolveIdentifier(
+	identifier: string
+): Promise<{ did: string; pdsUrl: string; handle?: string }> {
+	let did: string;
+	let handle: string | undefined;
 
-	if (did.startsWith('did:plc:')) {
-		const res = await fetch(`https://plc.directory/${did}`);
-		if (!res.ok) throw new Error(`Failed to resolve DID: ${res.status}`);
-		doc = await res.json();
-	} else if (did.startsWith('did:web:')) {
-		const domain = did.replace('did:web:', '');
-		const res = await fetch(`https://${domain}/.well-known/did.json`);
-		if (!res.ok) throw new Error(`Failed to resolve DID: ${res.status}`);
-		doc = await res.json();
+	// If it's already a DID, use it directly
+	if (identifier.startsWith('did:')) {
+		did = identifier;
 	} else {
-		throw new Error(`Unsupported DID method: ${did}`);
+		// It's a handle — resolve via Slingshot
+		const res = await fetch(
+			`${SLINGSHOT_URL}/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(identifier)}`
+		);
+		if (!res.ok) {
+			throw new Error(`Failed to resolve handle "${identifier}": ${res.status}`);
+		}
+		const data = (await res.json()) as { did: string };
+		did = data.did;
+		handle = identifier;
 	}
 
-	const handle = doc.alsoKnownAs?.find((h) => h.startsWith('at://'))?.replace('at://', '');
+	// Resolve DID document to get PDS URL
+	const doc = await resolveDidDocument(did);
+
+	// Extract handle from DID document if we didn't already have it
+	if (!handle) {
+		handle = doc.alsoKnownAs?.find((h) => h.startsWith('at://'))?.replace('at://', '');
+	}
+
 	const pdsService = doc.service?.find((s) => s.id === '#atproto_pds');
 	const pdsUrl = pdsService?.serviceEndpoint;
 
 	if (!pdsUrl) throw new Error('No PDS endpoint found in DID document');
 
-	return { pdsUrl, handle };
+	return { did, pdsUrl, handle };
+}
+
+async function resolveDidDocument(did: string): Promise<DidDocument> {
+	if (did.startsWith('did:plc:')) {
+		const res = await fetch(`https://plc.directory/${did}`);
+		if (!res.ok) throw new Error(`Failed to resolve DID: ${res.status}`);
+		return await res.json();
+	}
+
+	if (did.startsWith('did:web:')) {
+		const domain = did.replace('did:web:', '');
+		const res = await fetch(`https://${domain}/.well-known/did.json`);
+		if (!res.ok) throw new Error(`Failed to resolve DID: ${res.status}`);
+		return await res.json();
+	}
+
+	throw new Error(`Unsupported DID method: ${did}`);
 }
 
 interface ListRecordsResponse {

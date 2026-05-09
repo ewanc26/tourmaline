@@ -1,13 +1,14 @@
 # Tourmaline
 
-AT Protocol scrobble analyser. Ingests Teal.fm scrobbles from any DID, cross-references with free music APIs, and builds a listener profile.
+AT Protocol scrobble analyser. Ingests Teal.fm scrobbles from any handle or DID, cross-references with free music APIs, and builds a listener profile.
 
 ---
 
 ## How it works
 
-1. Enter a DID (`did:plc:...` or `did:web:...`)
-2. Fetches `fm.teal.alpha.feed.play` records from the user's PDS
+1. Enter a handle (e.g. `ewancroft.uk`) or DID (`did:plc:...` or `did:web:...`)
+2. Resolves identity via [Slingshot](https://slingshot.microcosm.blue) (handles → DIDs), then fetches the DID document for the PDS URL
+3. Fetches `fm.teal.alpha.feed.play` records from the user's PDS
 3. Aggregates play counts, timelines, and listening patterns
 4. Enriches artist data with MusicBrainz (genres), Last.fm (tags, similar artists), and Deezer (art, genres)
 5. Builds a listener profile: genre map, mood profile, diversity score, obscurity index, era preference, timeline heatmap
@@ -44,7 +45,7 @@ pnpm dev
 src/
 ├── lib/
 │   ├── atproto/
-│   │   └── resolve.ts        # DID resolution + scrobble fetching
+│   │   └── resolve.ts        # Handle/DID resolution via Slingshot + scrobble fetching
 │   ├── enrich/
 │   │   ├── cache.ts           # SQLite cache layer
 │   │   ├── musicbrainz.ts     # Genre + MBID enrichment
@@ -60,7 +61,7 @@ src/
 │   │   └── mood.ts            # Mood extraction from tags
 │   └── types.ts
 ├── routes/
-│   ├── +page.svelte           # DID input form
+│   ├── +page.svelte           # Handle/DID input form
 │   └── profile/[did]/
 │       ├── +page.server.ts    # Fetch + analyse + render
 │       ├── +page.svelte       # Profile display
@@ -77,6 +78,7 @@ src/
 
 | API | Purpose | Auth | Rate limit |
 |-----|---------|------|------------|
+| Slingshot | Handle → DID resolution | None | None |
 | MusicBrainz | Genres, MBIDs, release dates | User-Agent | 1 req/sec |
 | Last.fm | Tags, similar artists, listener counts | API key | Undocumented |
 | Deezer | Artist images, genre fallback | None | Undocumented |
