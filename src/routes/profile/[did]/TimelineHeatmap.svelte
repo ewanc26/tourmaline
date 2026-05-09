@@ -9,8 +9,6 @@
 	const countMap = $derived(new Map(dailyScrobbles.map((d) => [d.date, d.count])));
 	const maxCount = $derived(Math.max(...dailyScrobbles.map((d) => d.count), 1));
 
-	// Fixed 365-day grid: 53 columns (weeks), 7 rows (days)
-	// Today is the bottom-right cell. The grid extends back 365 days.
 	interface WeekCell {
 		date: string;
 		count: number;
@@ -21,9 +19,7 @@
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
 
-		// The last column is the week containing today.
-		// Go back to the Sunday of this week, then back 52 more weeks.
-		const todayDow = today.getDay(); // 0=Sun
+		const todayDow = today.getDay();
 		const thisSunday = new Date(today);
 		thisSunday.setDate(thisSunday.getDate() - todayDow);
 
@@ -37,7 +33,6 @@
 			const week: WeekCell[] = [];
 			for (let d = 0; d < 7; d++) {
 				if (current > today) {
-					// Future cells — blank
 					week.push({ date: '', count: -1, month: 0 });
 				} else {
 					const dateStr = current.toISOString().substring(0, 10);
@@ -55,7 +50,6 @@
 		return result;
 	});
 
-	// Month labels: placed at the first week where a new month starts
 	const monthLabels = $derived.by(() => {
 		const labels: { weekIndex: number; label: string }[] = [];
 		let lastMonth = -1;
@@ -64,7 +58,6 @@
 			const week = weeks[wi];
 			if (!week || week.length === 0) continue;
 
-			// Check the first non-empty cell's month
 			for (const cell of week) {
 				if (cell.count >= 0 && cell.month !== lastMonth) {
 					labels.push({ weekIndex: wi, label: monthNames[cell.month] });
@@ -78,7 +71,7 @@
 	});
 
 	function cellColour(count: number): string {
-		if (count < 0) return 'bg-transparent'; // future
+		if (count < 0) return 'bg-transparent';
 		if (count === 0) return 'bg-gray-800';
 		const intensity = count / maxCount;
 		if (intensity > 0.75) return 'bg-green-400';
@@ -94,42 +87,35 @@
 	}
 </script>
 
-<div class="overflow-x-auto">
-	<div class="inline-block min-w-full">
-		<!-- Month labels -->
-		<div class="mb-1 flex" style="padding-left: 2rem;">
-			{#each weeks as _, wi}
-				{@const label = monthLabels.find((l) => l.weekIndex === wi)}
-				<div class="text-xs text-gray-400" style="width: 1rem; min-width: 1rem;">
-					{label?.label ?? ''}
-				</div>
+<div class="w-full">
+	<!-- Month labels -->
+	<div class="mb-1 grid" style="grid-template-columns: 2rem repeat(53, 1fr); gap: 0 2px;">
+		<div></div>
+		{#each weeks as _, wi}
+			{@const label = monthLabels.find((l) => l.weekIndex === wi)}
+			<div class="text-xs text-gray-400 truncate">
+				{label?.label ?? ''}
+			</div>
+		{/each}
+	</div>
+
+	<!-- Day rows -->
+	<div class="grid" style="grid-template-columns: 2rem repeat(53, 1fr); grid-template-rows: repeat(7, 1fr); gap: 2px;">
+		<!-- Day labels column -->
+		{#each days as day}
+			<div class="flex items-center text-xs text-gray-400">
+				{day}
+			</div>
+		{/each}
+
+		<!-- Cell grid: 53 columns × 7 rows -->
+		{#each weeks as week}
+			{#each week as cell}
+				<div
+					class="aspect-square rounded-sm {cellColour(cell.count)}"
+					title={cell.date ? "{formatDate(cell.date)} — {cell.count} scrobble{cell.count !== 1 ? 's' : ''}" : ''}
+				></div>
 			{/each}
-		</div>
-
-		<!-- Day rows -->
-		<div class="flex gap-0">
-			<!-- Day labels -->
-			<div class="mr-1 flex flex-col" style="gap: 2px;">
-				{#each days as day}
-					<div class="flex h-4 items-center text-xs text-gray-400">
-						{day}
-					</div>
-				{/each}
-			</div>
-
-			<!-- Cell grid -->
-			<div class="flex" style="gap: 2px;">
-				{#each weeks as week}
-					<div class="flex flex-col" style="gap: 2px;">
-						{#each week as cell}
-							<div
-								class="h-4 w-4 rounded-sm {cellColour(cell.count)}"
-								title={cell.date ? "{formatDate(cell.date)} — {cell.count} scrobble{cell.count !== 1 ? 's' : ''}" : ''}
-							></div>
-						{/each}
-					</div>
-				{/each}
-			</div>
-		</div>
+		{/each}
 	</div>
 </div>
