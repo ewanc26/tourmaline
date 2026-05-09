@@ -93,13 +93,13 @@ function parseScrobble(v: Record<string, unknown>): TealScrobble {
 
 /**
  * Fetch scrobbles page by page, calling onBatch after each page.
- * Returns the complete list. The onBatch callback receives the newly
- * fetched scrobbles and the running total so far.
+ * The callback may be async — it is awaited before fetching the next page,
+ * so callers can tick() or otherwise flush the UI between batches.
  */
 export async function fetchScrobblesBatched(
 	pdsUrl: string,
 	did: string,
-	onBatch: (batch: TealScrobble[], totalSoFar: number) => void,
+	onBatch: (batch: TealScrobble[], totalSoFar: number) => void | Promise<void>,
 	signal?: AbortSignal
 ): Promise<TealScrobble[]> {
 	const limit = 100;
@@ -132,7 +132,7 @@ export async function fetchScrobblesBatched(
 		}
 
 		if (batch.length > 0) {
-			onBatch(batch, allScrobbles.length);
+			await onBatch(batch, allScrobbles.length);
 		}
 
 		cursor = data.cursor;

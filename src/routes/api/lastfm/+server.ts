@@ -2,8 +2,7 @@ import type { RequestHandler } from './$types';
 
 const BASE_URL = 'https://ws.audioscrobbler.com/2.0/';
 
-export const GET: RequestHandler = async ({ url }) => {
-	// Reconstruct the Last.fm API URL from the proxied query params
+export const GET: RequestHandler = async ({ url, fetch }) => {
 	const params = url.search.replace(/^\?/, '');
 	const targetUrl = `${BASE_URL}?${params}`;
 

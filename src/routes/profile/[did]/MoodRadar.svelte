@@ -6,7 +6,7 @@
 	let { mood = {} }: { mood: Record<string, number> } = $props();
 
 	let canvas: HTMLCanvasElement;
-	let chart = $state<Chart | null>(null);
+	let chart: Chart | null = null;
 
 	$effect(() => {
 		if (!canvas) return;
