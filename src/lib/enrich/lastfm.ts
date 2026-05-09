@@ -1,25 +1,8 @@
 import { getCached, setCache } from './cache';
 import type { ArtistInfo } from '$lib/types';
 
-let lastRequestTime = 0;
-
-async function rateLimitedFetch(params: URLSearchParams): Promise<Response> {
-	const now = Date.now();
-	const wait = Math.max(0, 250 - (now - lastRequestTime));
-	if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-	lastRequestTime = Date.now();
-
-	// Route through our server proxy to avoid CORS issues
-	const proxyUrl = `/api/lastfm?${params.toString()}`;
-	const res = await fetch(proxyUrl);
-
-	if (res.status === 429) {
-		await new Promise((r) => setTimeout(r, 5000));
-		return rateLimitedFetch(params);
-	}
-	if (!res.ok) throw new Error(`Last.fm API error: ${res.status}`);
-	return res;
-}
+// Rate limiting is handled server-side by the /api/lastfm proxy.
+// Client just fires requests — the server queues them at 5 req/s.
 
 interface LFMArtist {
 	name: string;
@@ -29,6 +12,14 @@ interface LFMArtist {
 	tags?: { tag: Array<{ name: string; count: string }> };
 	similar?: { artist: Array<{ name: string; mbid?: string }> };
 	image?: Array<{ '#text': string; size: string }>;
+}
+
+// Last.fm API key. Set via env var on server, or window.__LASTFM_API_KEY on client.
+function getApiKey(): string | null {
+	if (typeof window !== 'undefined') {
+		return (window as unknown as Record<string, string>).__LASTFM_API_KEY ?? null;
+	}
+	return process.env.LASTFM_API_KEY ?? null;
 }
 
 export async function getArtistInfo(name: string): Promise<ArtistInfo | null> {
@@ -47,9 +38,10 @@ export async function getArtistInfo(name: string): Promise<ArtistInfo | null> {
 		autocorrect: '1'
 	});
 
-	const res = await rateLimitedFetch(params);
-	const data = (await res.json()) as { artist?: LFMArtist };
+	const res = await fetch(`/api/lastfm?${params.toString()}`);
+	if (!res.ok) throw new Error(`Last.fm API error: ${res.status}`);
 
+	const data = (await res.json()) as { artist?: LFMArtist };
 	if (!data.artist) return null;
 
 	const a = data.artist;
@@ -69,14 +61,6 @@ export async function getArtistInfo(name: string): Promise<ArtistInfo | null> {
 
 	setCache(cacheKey, 'lastfm', info);
 	return info;
-}
-
-// Last.fm API key. Set via env var on server, or window.__LASTFM_API_KEY on client.
-function getApiKey(): string | null {
-	if (typeof window !== 'undefined') {
-		return (window as unknown as Record<string, string>).__LASTFM_API_KEY ?? null;
-	}
-	return process.env.LASTFM_API_KEY ?? null;
 }
 
 export async function getArtistTags(name: string): Promise<string[]> {

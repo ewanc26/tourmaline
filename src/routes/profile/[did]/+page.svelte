@@ -43,6 +43,29 @@
 		return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 	}
 
+	/**
+	 * Run tasks from a queue with N concurrent workers.
+	 * Each worker picks the next item, calls `process(item)`, then
+	 * calls `onDone()` (which can update UI and yield). Workers
+	 * keep pulling until the queue is drained.
+	 */
+	async function runConcurrent<T>(
+		items: T[],
+		concurrency: number,
+		process: (item: T) => Promise<void>,
+		onDone: () => Promise<void>
+	): Promise<void> {
+		let next = 0;
+		async function worker() {
+			while (next < items.length) {
+				const item = items[next++];
+				await process(item);
+				await onDone();
+			}
+		}
+		await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+	}
+
 	/** Enrich a single artist with MusicBrainz, Last.fm, and Deezer data. */
 	async function enrichOneArtist(name: string, i: number, total: number): Promise<void> {
 		// MusicBrainz
@@ -175,44 +198,38 @@
 			profile = emptyProfile(did, handle);
 			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${identity.pdsUrl}`);
 
-			// 2. Fetch scrobbles — enrich top artists progressively as they appear
+			// 2. Fetch scrobbles
 			phase = 'fetching';
 			const fetchStart = performance.now();
-			const enrichedNames = new Set<string>();
 			await fetchScrobblesBatched(identity.pdsUrl, did, async (batch, totalSoFar) => {
 				aggregator.add(batch);
 				loaded = totalSoFar;
 				updateProfile(aggregator.snapshot());
-
-				// Start enriching any new top artists that appeared in this batch
-				const topArtists = aggregator.snapshot().topArtists;
-				enrichProgress = { current: enrichedNames.size, total: topArtists.length };
-				for (const { name } of topArtists) {
-					if (enrichedNames.has(name)) continue;
-					enrichedNames.add(name);
-					await enrichOneArtist(name, enrichedNames.size - 1, topArtists.length);
-					enrichProgress.current = enrichedNames.size;
-					updateProfile(aggregator.snapshot());
-					await yieldFrame();
-				}
+				await yieldFrame();
 			});
 			console.log(`[tourmaline] fetched ${loaded} scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 
-			// 3. Enrich any remaining top artists not yet processed
-			// (top artists list may have shifted as more scrobbles arrived)
+			// 3. Enrich top artists — 6 concurrent workers
+			// Server-side rate limiting in the proxy routes handles API pacing.
+			// MusicBrainz: 1 req/s, Last.fm: 5 req/s, Deezer: no limit.
+			// 6 workers means ~6 artists processed in parallel (each hits all 3 APIs).
 			phase = 'enriching';
-			const finalTop = aggregator.snapshot().topArtists;
-			enrichProgress = { current: enrichedNames.size, total: finalTop.length };
-			console.log(`[tourmaline] enriching remaining artists (${enrichedNames.size}/${finalTop.length} already done)`);
-			for (let i = 0; i < finalTop.length; i++) {
-				const { name } = finalTop[i];
-				if (enrichedNames.has(name)) continue;
-				enrichedNames.add(name);
-				await enrichOneArtist(name, i, finalTop.length);
-				enrichProgress.current = enrichedNames.size;
-				updateProfile(aggregator.snapshot());
-				await yieldFrame();
-			}
+			const topArtists = aggregator.snapshot().topArtists;
+			enrichProgress = { current: 0, total: topArtists.length };
+			console.log(`[tourmaline] enriching ${topArtists.length} artists (6 concurrent)`);
+
+			await runConcurrent(
+				topArtists,
+				6,
+				async ({ name }) => {
+					await enrichOneArtist(name, 0, topArtists.length);
+				},
+				async () => {
+					enrichProgress.current++;
+					updateProfile(aggregator.snapshot());
+					await yieldFrame();
+				}
+			);
 
 			phase = 'complete';
 			console.log(`[tourmaline] complete in ${((performance.now() - t0) / 1000).toFixed(1)}s — ${loaded} scrobbles, ${artistInfos.size} artists enriched`);

@@ -3,21 +3,8 @@ import type { ArtistInfo } from '$lib/types';
 
 const USER_AGENT = 'Tourmaline/0.1.0 (https://github.com/ewanc26/tourmaline)';
 
-let lastRequestTime = 0;
-
-async function rateLimitedFetch(path: string): Promise<Response> {
-	const now = Date.now();
-	const wait = Math.max(0, 1100 - (now - lastRequestTime));
-	if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-	lastRequestTime = Date.now();
-
-	// Route through our server proxy to avoid CORS / forbidden header issues
-	const proxyUrl = `/api/musicbrainz${path}`;
-	const res = await fetch(proxyUrl);
-
-	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
-	return res;
-}
+// Rate limiting is handled server-side by the /api/musicbrainz proxy.
+// Client just fires requests — the server queues them at 1 req/s.
 
 interface MBArtist {
 	id: string;
@@ -45,9 +32,10 @@ export async function searchArtist(name: string): Promise<string | null> {
 	if (cached !== null) return cached;
 
 	const path = `/artist?query=artist:${encodeURIComponent(name)}&limit=1&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
-	const res = await rateLimitedFetch(path);
-	const data: MBSearchResult = await res.json();
+	const res = await fetch(`/api/musicbrainz${path}`);
+	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
 
+	const data: MBSearchResult = await res.json();
 	const match = data.artists?.[0]?.id ?? null;
 	setCache(cacheKey, 'musicbrainz', match);
 	return match;
@@ -59,9 +47,10 @@ export async function getArtistInfo(mbId: string): Promise<ArtistInfo | null> {
 	if (cached) return cached;
 
 	const path = `/artist/${mbId}?inc=tags+genres+ratings&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
-	const res = await rateLimitedFetch(path);
-	const data: MBArtist = await res.json();
+	const res = await fetch(`/api/musicbrainz${path}`);
+	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
 
+	const data: MBArtist = await res.json();
 	const info: ArtistInfo = {
 		name: data.name,
 		mbId: data.id,
@@ -82,9 +71,10 @@ export async function getReleaseGroupDecade(mbId: string): Promise<string | null
 	if (cached !== null) return cached;
 
 	const path = `/release-group/${mbId}?inc=&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
-	const res = await rateLimitedFetch(path);
-	const data: MBReleaseGroup = await res.json();
+	const res = await fetch(`/api/musicbrainz${path}`);
+	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
 
+	const data: MBReleaseGroup = await res.json();
 	const date = data['first-release-date'];
 	const decade = date ? `${date.substring(0, 3)}0s` : null;
 
