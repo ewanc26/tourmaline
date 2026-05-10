@@ -41,7 +41,7 @@
 			<img src="/logo.svg" alt="Tourmaline" width={120} height={120} />
 		</div>
 		<p class="wordmark">tourmaline</p>
-		<p class="eyebrow">Open source · Read-only · No account needed</p>
+		<p class="eyebrow">Open source · No sign-in needed</p>
 		<h1>Discover what kind of<br />listener you are.</h1>
 		<p class="sub">
 			Tourmaline analyses your
@@ -116,8 +116,8 @@
 		</div>
 		<div class="feature-card">
 			<span class="feature-icon"><Shield size={20} /></span>
-			<h3>Read-only</h3>
-			<p>No sign-in required. Reads public scrobbles from any PDS. Nothing is written.</p>
+			<h3>Privacy-first</h3>
+			<p>No sign-in needed to browse. Reads public scrobbles from any PDS. Sign-in only required to share.</p>
 		</div>
 	</section>
 
