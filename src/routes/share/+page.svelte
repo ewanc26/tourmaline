@@ -5,6 +5,7 @@
 	import { sharePersonality } from '$lib/share/post';
 	import { renderPersonalitySvg } from '$lib/share/personality-svg';
 	import type { PersonalityCardData } from '$lib/share/personality-svg';
+	import { ExternalLink, ArrowLeft } from '@lucide/svelte';
 
 	export const ssr = false;
 
@@ -143,7 +144,7 @@
 				rel="noopener"
 				class="mt-3 inline-block text-sm text-[var(--accent)] underline"
 			>
-				View post ↗
+				View post <ExternalLink size={12} />
 			</a>
 		</div>
 	{:else if card}
@@ -204,6 +205,6 @@
 	{/if}
 
 	<div class="mt-6 text-center">
-		<a href={profileUrl} class="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]">← Back to profile</a>
+		<a href={profileUrl} class="inline-flex items-center gap-1 text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]"><ArrowLeft size={12} /> Back to profile</a>
 	</div>
 </div>
