@@ -14,6 +14,26 @@ export interface IdentityResult {
 	handle?: string;
 }
 
+export interface ProfileRecord {
+	displayName?: string;
+	avatar?: string;
+}
+
+export async function fetchBlueskyProfile(pdsUrl: string, did: string): Promise<ProfileRecord> {
+	const url = `${pdsUrl}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=app.bsky.actor.profile&rkey=self`;
+	try {
+		const res = await fetch(url);
+		if (!res.ok) return {};
+		const data = (await res.json()) as { value?: { displayName?: string; avatar?: string } };
+		return {
+			displayName: data.value?.displayName,
+			avatar: data.value?.avatar
+		};
+	} catch {
+		return {};
+	}
+}
+
 export async function resolveIdentifier(identifier: string): Promise<IdentityResult> {
 	let did: string;
 	let handle: string | undefined;
