@@ -9,10 +9,6 @@
 
 <div class="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
 	<!-- Header -->
-	<p class="font-mono text-xs text-[var(--accent-dim)]">
-		<span class="text-[var(--text-dim)]">tourmaline</span><span class="text-[var(--border)]">@</span><span class="text-[var(--text-dim)]">profile</span><span class="text-[var(--border)]">:~$</span>
-		<span class="ml-1 text-[var(--text-muted)]">identify</span>
-	</p>
 	<h2 class="mt-2 text-base font-semibold text-[var(--text)] sm:text-lg">
 		<span class="text-[var(--text-muted)]">{displayName} is a</span>
 		<span class="ml-1 text-[var(--accent)]">{personality.archetype}</span>
