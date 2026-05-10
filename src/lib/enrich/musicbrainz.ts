@@ -12,6 +12,7 @@ interface MBArtist {
 	tags?: Array<{ name: string; count: number }>;
 	genres?: Array<{ name: string; count: number }>;
 	rating?: { value?: number };
+	'life-span'?: { begin?: string; end?: string; ended?: boolean };
 }
 
 interface MBReleaseGroup {
@@ -51,6 +52,8 @@ export async function getArtistInfo(mbId: string): Promise<ArtistInfo | null> {
 	if (!res.ok) throw new Error(`MusicBrainz API error: ${res.status}`);
 
 	const data: MBArtist = await res.json();
+	const beginDate = data['life-span']?.begin;
+	const startYear = beginDate ? parseInt(beginDate.substring(0, 4), 10) : undefined;
 	const info: ArtistInfo = {
 		name: data.name,
 		mbId: data.id,
@@ -58,7 +61,8 @@ export async function getArtistInfo(mbId: string): Promise<ArtistInfo | null> {
 		tags: (data.tags ?? []).sort((a, b) => b.count - a.count).map((t) => t.name),
 		similar: [],
 		listenerCount: undefined,
-		playCount: undefined
+		playCount: undefined,
+		startYear: isNaN(startYear!) ? undefined : startYear
 	};
 
 	setCache(cacheKey, 'musicbrainz', info);

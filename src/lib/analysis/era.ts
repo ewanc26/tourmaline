@@ -1,15 +1,30 @@
-import { searchArtist, getReleaseGroupDecade } from '$lib/enrich/musicbrainz';
-import { getCached, setCache } from '$lib/enrich/cache';
 import type { AggregatedData } from './aggregator';
-import type { EraEntry } from '$lib/types';
+import type { ArtistInfo, EraEntry } from '$lib/types';
 
-export async function buildEraProfile(data: AggregatedData): Promise<EraEntry[]> {
+/**
+ * Build an era preference profile from artist start years.
+ * Uses the MusicBrainz life-span.begin date to determine when
+ * each artist started, then weights by play count.
+ *
+ * This is a proxy — it measures when the artists you listen to
+ * emerged, not when the specific tracks were released. Artists with
+ * long careers (e.g. Iron Maiden, started 1975) push toward earlier
+ * decades even if you mostly listen to their recent output.
+ * Still, it's a reasonable approximation of era preference.
+ */
+export function buildEraProfile(
+	data: AggregatedData,
+	artistInfos: Map<string, ArtistInfo>
+): EraEntry[] {
 	const decadeCounts = new Map<string, number>();
 
-	// Use top albums to estimate era. We need their MusicBrainz release group IDs.
-	// Since we don't have album MBIDs from scrobbles in most cases, we skip era
-	// analysis for now and rely on artist start year as a proxy.
-	// This is a future enhancement — needs album-level MBID data from scrobbles.
+	for (const { name, count } of data.topArtists) {
+		const info = artistInfos.get(name);
+		if (!info?.startYear) continue;
+
+		const decade = `${Math.floor(info.startYear / 10) * 10}s`;
+		decadeCounts.set(decade, (decadeCounts.get(decade) ?? 0) + count);
+	}
 
 	return [...decadeCounts.entries()]
 		.map(([decade, count]) => ({ decade, count }))

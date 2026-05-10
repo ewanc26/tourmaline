@@ -1,4 +1,5 @@
 import type { ListenerProfile } from '$lib/types';
+import { calculateGini } from './diversity';
 
 export interface PersonalityTrait {
 	label: string;
@@ -197,12 +198,83 @@ function checkOverrides(profile: ListenerProfile): Archetype | null {
 	return null;
 }
 
+// ─── Genre blends ──────────────────────────────────────────────────────────
+// When two genres are close in weight (within 30%), blend them.
+// Key is the two genres sorted alphabetically and joined with "+".
+
+const BLENDS: Record<string, Record<string, Archetype>> = {
+	'Electronic+Metal': {
+		Aggressive: { name: 'Freq Crusher', blurb: 'Where industrial meets the void — synthesized aggression as a way of life.' },
+		Atmospheric: { name: 'Grid Walker', blurb: 'Moves between electronic architecture and metal weight with equal ease.' },
+		Energetic: { name: 'Voltage Alchemist', blurb: 'Fuses circuit and distortion into something neither genre could reach alone.' },
+		_default: { name: 'Circuit Breaker', blurb: 'At home in both the digital and the distorted.' },
+	},
+	'Electronic+Pop': {
+		Happy: { name: 'Frequency Chaser', blurb: 'Drawn to the bright intersection of synths and hooks.' },
+		Energetic: { name: 'Signal Pop', blurb: 'Where the dancefloor meets the radio edit.' },
+		Nostalgic: { name: 'Retro Wavelength', blurb: 'Collects the pop of imagined futures past.' },
+		_default: { name: 'Synth Keeper', blurb: 'Comfortable where electronic production meets pop songwriting.' },
+	},
+	'Folk+Rock': {
+		Nostalgic: { name: 'Highway Pilgrim', blurb: 'Finds the story in both the amplifier and the acoustic.' },
+		Melancholic: { name: 'Dust Wanderer', blurb: 'Drawn to the weathered end of both folk and rock.' },
+		Energetic: { name: 'Campfire Voltage', blurb: 'Turns up the volume on songs that were already loud enough.' },
+		_default: { name: 'Crossroad Keeper', blurb: 'Where the riff meets the road.' },
+	},
+	'Hip Hop+R&B': {
+		Chill: { name: 'Velvet Loop', blurb: 'Lives in the smooth, low-lit space between rap and soul.' },
+		Energetic: { name: 'Cadence Hunter', blurb: 'Follows the rhythm whether it raps or croons.' },
+		Aggressive: { name: 'Cipher Pulse', blurb: 'Drawn to the confrontational edge of both genres.' },
+		_default: { name: 'Rhythm Keeper', blurb: 'Does not distinguish between the beat and the groove.' },
+	},
+	'Metal+Rock': {
+		Aggressive: { name: 'Iron Chaser', blurb: 'Runs the full spectrum from heavy to heavier.' },
+		Atmospheric: { name: 'Cathedral Signal', blurb: 'Drawn to the grand and the textured — from stoner fuzz to post-metal weight.' },
+		Nostalgic: { name: 'Amp Archaeologist', blurb: 'Treats the history of loud guitar as a living archive.' },
+		Energetic: { name: 'Riff Runner', blurb: 'Lives for the moment where rock ends and metal begins.' },
+		_default: { name: 'Amplifier Keeper', blurb: 'Comfortable anywhere the volume goes up.' },
+	},
+	'Pop+Rock': {
+		Happy: { name: 'Chorus Pilot', blurb: 'Follows the hook wherever it leads — pop structure, rock delivery.' },
+		Energetic: { name: 'Anthem Chaser', blurb: 'Here for the songs that fill rooms.' },
+		Nostalgic: { name: 'Dial Keeper', blurb: 'Catalogues the radio hits of every decade with quiet affection.' },
+		_default: { name: 'Wavelength Keeper', blurb: 'Where the melody meets the distortion pedal.' },
+	},
+	'Rock+Soundtrack': {
+		Atmospheric: { name: 'Score Pilgrim', blurb: 'Drawn to the cinematic — whether it comes from a guitar or an orchestra.' },
+		Nostalgic: { name: 'Scene Archaeologist', blurb: 'Treats soundtracks and rock albums as parts of the same archive.' },
+		_default: { name: 'Cinematic Wanderer', blurb: 'Where the stage meets the screen.' },
+	},
+};
+
+function blendKey(a: string, b: string): string {
+	return [a, b].sort().join('+');
+}
+
 function pickArchetype(profile: ListenerProfile): Archetype {
 	const override = checkOverrides(profile);
 	if (override) return override;
 
 	const topGenre = profile.genres[0]?.name ?? '';
+	const secondGenre = profile.genres[1]?.name ?? '';
 	const topMood = topKey(profile.mood) as Mood | null;
+
+	// Check for genre blend when top two genres are within 30% weight
+	if (secondGenre && profile.genres.length >= 2) {
+		const topWeight = profile.genres[0].weight;
+		const secondWeight = profile.genres[1].weight;
+		if (topWeight > 0 && secondWeight / topWeight >= 0.7) {
+			const key = blendKey(topGenre, secondGenre);
+			const blendMap = BLENDS[key];
+			if (blendMap) {
+				if (topMood && blendMap[topMood]) {
+					return blendMap[topMood];
+				}
+				return blendMap['_default'] ?? { name: 'Open Listener', blurb: 'Hard to pin down — which is probably the point.' };
+			}
+		}
+	}
+
 	const genreMap = ARCHETYPES[topGenre];
 
 	if (!genreMap) {
@@ -236,23 +308,26 @@ function loyaltyTrait(profile: ListenerProfile): PersonalityTrait {
 	if (profile.totalScrobbles === 0) {
 		return { label: 'Listener type', value: 'Unknown', detail: 'Not enough data' };
 	}
-	const ratio = profile.uniqueTracks / profile.totalScrobbles;
+
+	// Gini coefficient: 0 = perfectly equal, 1 = all plays to one artist
+	// High Gini → deep repeater, low Gini → relentless explorer
+	const gini = profile.giniCoefficient;
 
 	let value: string;
 	let detail: string;
 
-	if (ratio < 0.25) {
+	if (gini >= 0.75) {
 		value = 'Deep repeater';
-		detail = `Plays the same tracks over and over — ${Math.round(profile.totalScrobbles / Math.max(profile.uniqueTracks, 1))}× average per track`;
-	} else if (ratio < 0.5) {
+		detail = `Concentrates heavily on a few artists (Gini ${gini.toFixed(2)})`;
+	} else if (gini >= 0.5) {
 		value = 'Balanced listener';
 		detail = 'Revisits favourites but keeps seeking new things';
-	} else if (ratio < 0.75) {
+	} else if (gini >= 0.3) {
 		value = 'Active explorer';
-		detail = 'Consistently seeking out new tracks';
+		detail = 'Consistently seeking out new artists';
 	} else {
 		value = 'Relentless explorer';
-		detail = 'Rarely replays anything — every listen is a first listen';
+		detail = 'Distributes attention widely — rarely replays anything';
 	}
 
 	return { label: 'Listener type', value, detail };

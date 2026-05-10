@@ -4,9 +4,10 @@
 	import { Aggregator } from '$lib/analysis/aggregator';
 	import { buildGenreProfile } from '$lib/analysis/genres';
 	import { buildTimeline } from '$lib/analysis/timeline';
-	import { diversityScore } from '$lib/analysis/diversity';
+	import { diversityScore, calculateGini } from '$lib/analysis/diversity';
 	import { calculateObscurity } from '$lib/analysis/obscurity';
 	import { buildMoodProfile } from '$lib/analysis/mood';
+	import { buildEraProfile } from '$lib/analysis/era';
 	import { enrichArtist } from '$lib/enrich/musicbrainz';
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
@@ -163,6 +164,7 @@
 			dailyScrobbles: [],
 			era: [],
 			diversityScore: 0,
+			giniCoefficient: 0,
 			obscurityIndex: 50,
 			mood: {}
 		};
@@ -172,8 +174,10 @@
 		const genres = buildGenreProfile(data, artistInfos);
 		const timeline = buildTimeline(data);
 		const diversity = diversityScore(data);
+		const gini = calculateGini(data);
 		const obscurity = calculateObscurity(data, artistInfos);
 		const mood = buildMoodProfile(data, artistInfos);
+		const era = buildEraProfile(data, artistInfos);
 
 		profile = {
 			did,
@@ -192,8 +196,9 @@
 			dailyScrobbles: [...data.dailyScrobbles.entries()]
 				.map(([date, count]) => ({ date, count }))
 				.sort((a, b) => a.date.localeCompare(b.date)),
-			era: [],
+			era,
 			diversityScore: diversity,
+			giniCoefficient: gini,
 			obscurityIndex: obscurity,
 			mood
 		};

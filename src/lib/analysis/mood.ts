@@ -241,12 +241,44 @@ export function buildMoodProfile(
 
 	if (totalWeight === 0) return moodScores;
 
-	// Normalise to 0-100
-	const maxScore = Math.max(...Object.values(moodScores));
-	if (maxScore === 0) return moodScores;
+	// ── Time-of-day mood weighting ────────────────────────────────────────
+	// Night listening (22:00–05:00) amplifies Dark, Melancholic, Atmospheric.
+	// Morning/daytime (06:00–11:00) amplifies Happy, Energetic.
+	// Late night (00:00–04:00) gives an extra boost to Dark and Atmospheric.
+
+	const totalScrobbles = data.scrobblesByHour.reduce((a, b) => a + b, 0);
+	if (totalScrobbles > 0) {
+		const nightHours = data.scrobblesByHour.slice(22, 24).reduce((a, b) => a + b, 0)
+			+ data.scrobblesByHour.slice(0, 5).reduce((a, b) => a + b, 0);
+		const lateNightHours = data.scrobblesByHour.slice(0, 4).reduce((a, b) => a + b, 0);
+		const morningHours = data.scrobblesByHour.slice(6, 12).reduce((a, b) => a + b, 0);
+
+		const nightRatio = nightHours / totalScrobbles;
+		const lateNightRatio = lateNightHours / totalScrobbles;
+		const morningRatio = morningHours / totalScrobbles;
+
+		// Night boost: up to 15% boost at 80% night listening
+		const nightBoost = 1 + (nightRatio * 0.15);
+		// Late night extra: up to 10% additional boost for Dark/Atmospheric
+		const lateNightBoost = 1 + (lateNightRatio * 0.10);
+		// Morning boost: up to 15% boost at 80% morning listening
+		const morningBoost = 1 + (morningRatio * 0.15);
+
+		moodScores.Dark *= nightBoost * lateNightBoost;
+		moodScores.Melancholic *= nightBoost;
+		moodScores.Atmospheric *= nightBoost * lateNightBoost;
+		moodScores.Happy *= morningBoost;
+		moodScores.Energetic *= morningBoost;
+	}
+
+	// ── Normalise against total mood weight (not max) ────────────────────
+	// This gives the actual distribution: if Energetic is 60% of total mood
+	// weight, it shows as 60, not 100.
+	const sumScores = Object.values(moodScores).reduce((a, b) => a + b, 0);
+	if (sumScores === 0) return moodScores;
 
 	for (const mood of MOOD_KEYS) {
-		moodScores[mood] = Math.round((moodScores[mood] / maxScore) * 100);
+		moodScores[mood] = Math.round((moodScores[mood] / sumScores) * 100);
 	}
 
 	return moodScores;
