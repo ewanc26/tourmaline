@@ -20,10 +20,8 @@
 	<meta name="description" content="Discover what kind of listener you are. Analyses Teal.fm scrobbles from any AT Protocol account." />
 </svelte:head>
 
-<div class="flex min-h-screen flex-col items-center justify-center px-4">
+<div class="flex flex-1 flex-col items-center justify-center px-4">
 	<div class="w-full max-w-lg text-center">
-		<h1 class="text-4xl font-bold">Tourmaline</h1>
-		<p class="mt-2 text-gray-400">AT Protocol scrobble analyser</p>
 		<p class="mt-4 text-sm text-gray-500">
 			Enter a handle or DID to analyse their Teal.fm listening history.
 		</p>

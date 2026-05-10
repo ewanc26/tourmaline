@@ -307,8 +307,7 @@
 
 <div class="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-8">
 	<header class="mb-6 sm:mb-8">
-		<a href="/" class="text-sm text-gray-400 hover:text-white">&larr; Back</a>
-		<div class="mt-2 flex items-center gap-3 sm:gap-4">
+		<div class="flex items-center gap-3 sm:gap-4">
 			{#if bskyAvatar}
 				<img src={bskyAvatar} alt="" class="h-10 w-10 shrink-0 rounded-full border border-gray-700 sm:h-12 sm:w-12" />
 			{/if}
