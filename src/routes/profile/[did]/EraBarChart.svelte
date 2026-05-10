@@ -59,6 +59,6 @@
 	});
 </script>
 
-<div class="h-64">
+<div class="h-48 sm:h-64">
 	<canvas bind:this={canvas}></canvas>
 </div>

@@ -28,7 +28,7 @@
 			Enter a handle or DID to analyse their Teal.fm listening history.
 		</p>
 
-		<form onsubmit={(e) => { e.preventDefault(); analyse(); }} class="mt-8 flex gap-2">
+		<form onsubmit={(e) => { e.preventDefault(); analyse(); }} class="mt-8 flex flex-col gap-2 sm:flex-row">
 			<input
 				type="text"
 				bind:value={identifier}

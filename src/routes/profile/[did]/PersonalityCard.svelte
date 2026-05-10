@@ -7,13 +7,13 @@
 	const personality = $derived(buildPersonality(profile));
 </script>
 
-<div class="rounded border border-gray-700 bg-gray-800 p-6">
+<div class="rounded border border-gray-700 bg-gray-800 p-4 sm:p-6">
 	<!-- Header -->
 	<p class="font-mono text-xs text-green-500">
 		<span class="text-gray-500">tourmaline</span><span class="text-gray-600">@</span><span class="text-gray-500">profile</span><span class="text-gray-600">:~$</span>
 		<span class="ml-1 text-gray-400">identify</span>
 	</p>
-	<h2 class="mt-2 text-lg font-semibold text-gray-100">
+	<h2 class="mt-2 text-base font-semibold text-gray-100 sm:text-lg">
 		<span class="text-gray-400">{displayName} is a</span>
 		<span class="ml-1 text-green-400">{personality.archetype}</span>
 	</h2>
