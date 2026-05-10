@@ -17,7 +17,7 @@
 
 		<div class="flex flex-wrap gap-2">
 			<span class="pill">No tracking</span>
-			<span class="pill">No accounts</span>
+			<span class="pill">No sign-in to browse</span>
 			<span class="pill">No server storage</span>
 		</div>
 
@@ -35,7 +35,7 @@
 			</li>
 			<li>
 				<strong>Your PDS</strong> — reads <code>fm.teal.alpha.feed.play</code> records from
-				your Personal Data Server. This is a read-only operation; no records are written.
+				your Personal Data Server. Reading is unauthenticated; the only write is sharing your personality profile to Bluesky — which requires explicit OAuth consent.
 			</li>
 			<li>
 				<strong>MusicBrainz</strong> — enriches top artists with genre and tag data. Rate-limited
