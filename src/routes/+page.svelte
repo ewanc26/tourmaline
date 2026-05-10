@@ -18,20 +18,20 @@
 </script>
 
 <svelte:head>
-	<title>Tourmaline — AT Protocol Scrobble Analyser</title>
-	<meta name="description" content="Discover what kind of listener you are. Analyses Teal.fm scrobbles from any AT Protocol account." />
+	<title>Tourmaline — Teal.fm Scrobble Analyser</title>
+	<meta name="description" content="Discover what kind of listener you are. Analyses your Teal.fm scrobbles — genres, moods, eras, obscurity, and a personality archetype." />
 	<link rel="canonical" href="https://tourmaline.croft.click" />
 
 	<!-- Open Graph -->
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content="https://tourmaline.croft.click" />
-	<meta property="og:title" content="Tourmaline — AT Protocol Scrobble Analyser" />
-	<meta property="og:description" content="Discover what kind of listener you are. Analyses Teal.fm scrobbles from any AT Protocol account." />
+	<meta property="og:title" content="Tourmaline — Teal.fm Scrobble Analyser" />
+	<meta property="og:description" content="Discover what kind of listener you are. Analyses your Teal.fm scrobbles — genres, moods, eras, obscurity, and a personality archetype." />
 
 	<!-- Twitter / X card -->
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Tourmaline — AT Protocol Scrobble Analyser" />
-	<meta name="twitter:description" content="Discover what kind of listener you are. Analyses Teal.fm scrobbles from any AT Protocol account." />
+	<meta name="twitter:title" content="Tourmaline — Teal.fm Scrobble Analyser" />
+	<meta name="twitter:description" content="Discover what kind of listener you are. Analyses your Teal.fm scrobbles — genres, moods, eras, obscurity, and a personality archetype." />
 </svelte:head>
 
 <main>
@@ -46,7 +46,7 @@
 		<p class="sub">
 			Tourmaline analyses your
 			<a href="https://teal.fm" target="_blank" rel="noopener">Teal</a>
-			scrobbles from any AT Protocol account — genres, moods, eras, obscurity, and a
+			scrobbles — genres, moods, eras, obscurity, and a
 			personality archetype.
 		</p>
 
@@ -129,7 +129,7 @@
 				<span class="step-num">1</span>
 				<div>
 					<strong>Enter a handle</strong>
-					<p>Any AT Protocol handle or DID. No sign-in, no app password.</p>
+					<p>Any Bluesky handle or DID. No sign-in, no app password.</p>
 				</div>
 			</li>
 			<li>
@@ -168,7 +168,7 @@
 	<!-- ── CTA ──────────────────────────────────────────────────────────────── -->
 	<section class="cta">
 		<h2>Try it</h2>
-		<p>Enter any Bluesky handle or AT Protocol DID. No account needed.</p>
+		<p>Enter any Bluesky handle or DID. No account needed.</p>
 		<form onsubmit={(e) => { e.preventDefault(); analyse(); }} class="cta-form">
 			<input
 				type="text"

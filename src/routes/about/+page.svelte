@@ -22,7 +22,7 @@
 		</div>
 
 		<p>
-			Tourmaline analyses your listening history directly from your AT Protocol PDS.
+			Tourmaline analyses your listening history from your Teal.fm scrobbles.
 			Your scrobbles are fetched, processed in your browser, and cached in IndexedDB for
 			faster repeat visits. No data is sent to any server other than your own PDS.
 		</p>
@@ -30,7 +30,7 @@
 		<ul>
 			<li>
 				<strong>Slingshot</strong> (<code>slingshot.microcosm.blue</code>) — resolves your
-				ATProto handle to a DID and PDS URL. This is a standard identity lookup. No
+				Bluesky handle to a DID and PDS URL. This is a standard identity lookup. No
 				personally identifiable data beyond your handle is sent.
 			</li>
 			<li>
@@ -192,7 +192,7 @@
 			</li>
 			<li>
 				<a href="https://slingshot.microcosm.blue" target="_blank" rel="noopener">Slingshot</a>
-				— AT Protocol identity resolution
+				— identity resolution
 			</li>
 			<li>
 				<a href="https://teal.fm" target="_blank" rel="noopener">Teal</a>

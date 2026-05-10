@@ -12,7 +12,7 @@
 					<img src="/logo.svg" alt="Tourmaline" class="h-7 w-7 sm:h-8 sm:w-8" />
 					<span class="text-sm font-semibold tracking-tight">Tourmaline</span>
 				</a>
-				<span class="text-xs text-[var(--text-dim)]">AT Protocol scrobble analyser</span>
+				<span class="text-xs text-[var(--text-dim)]">Teal.fm scrobble analyser</span>
 			</div>
 			<nav class="flex items-center gap-4 text-xs text-[var(--text-muted)]">
 				<a href="/about" class="hover:text-[var(--accent)]">About</a>
