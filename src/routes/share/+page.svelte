@@ -1,0 +1,179 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import type { Agent } from '@atproto/api';
+	import { initOAuth, signInWithOAuth } from '$lib/atproto/oauth';
+	import { sharePersonality } from '$lib/share/post';
+	import { renderPersonalitySvg } from '$lib/share/personality-svg';
+	import type { PersonalityCardData } from '$lib/share/personality-svg';
+
+	export const ssr = false;
+
+	const STORAGE_KEY = 'tourmaline:share';
+
+	let agent = $state<Agent | null>(null);
+	let card = $state<PersonalityCardData | null>(null);
+	let handle = $state('');
+	let svgPreview = $state('');
+
+	let loading = $state(true);
+	let signingIn = $state(false);
+	let posting = $state(false);
+	let done = $state(false);
+	let postUri = $state('');
+	let error = $state('');
+
+	onMount(async () => {
+		// Restore personality data from sessionStorage
+		const stored = sessionStorage.getItem(STORAGE_KEY);
+		if (stored) {
+			try {
+				const parsed = JSON.parse(stored) as PersonalityCardData;
+				card = parsed;
+				svgPreview = renderPersonalitySvg(parsed);
+			} catch {
+				error = 'No personality data found. Go back to your profile and try again.';
+			}
+		} else {
+			error = 'No personality data found. Go back to your profile and try again.';
+		}
+
+		// Try to restore an existing OAuth session
+		try {
+			agent = await initOAuth();
+		} catch (e) {
+			console.warn('[tourmaline] OAuth init failed:', e);
+		}
+
+		loading = false;
+	});
+
+	async function doSignIn() {
+		if (!handle.trim()) return;
+		signingIn = true;
+		error = '';
+		try {
+			await signInWithOAuth(handle.trim());
+		} catch (e: any) {
+			error = e.message ?? 'OAuth sign-in failed';
+			signingIn = false;
+		}
+	}
+
+	async function doPost() {
+		if (!agent || !card) return;
+		posting = true;
+		error = '';
+		try {
+			const result = await sharePersonality(agent, card);
+			postUri = result.uri;
+			done = true;
+			sessionStorage.removeItem(STORAGE_KEY);
+		} catch (e: any) {
+			error = e.message ?? 'Failed to post';
+		} finally {
+			posting = false;
+		}
+	}
+
+	function postUrl(): string {
+		if (!postUri) return '';
+		// at://did:plc:.../app.bsky.feed.post/rkey → https://bsky.app/profile/did/rkey
+		const parts = postUri.split('/');
+		const did = parts[2];
+		const rkey = parts[4];
+		return `https://bsky.app/profile/${did}/post/${rkey}`;
+	}
+</script>
+
+<svelte:head>
+	<title>Share — tourmaline</title>
+</svelte:head>
+
+<div class="mx-auto max-w-lg px-3 py-8 sm:px-4">
+	<h1 class="text-lg font-bold text-[var(--text)]">Share to Bluesky</h1>
+
+	{#if error}
+		<div class="mt-4 rounded border border-[var(--error)]/30 bg-[var(--error)]/10 p-3 text-sm text-[var(--error)]">
+			{error}
+		</div>
+	{/if}
+
+	{#if loading}
+		<div class="mt-6 flex items-center gap-3">
+			<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+			<span class="text-sm text-[var(--text-muted)]">Restoring session...</span>
+		</div>
+	{:else if done}
+		<div class="mt-6 rounded border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-4">
+			<p class="text-sm font-medium text-[var(--accent)]">Posted!</p>
+			<p class="mt-2 text-sm text-[var(--text-muted)]">Your personality profile is now on Bluesky.</p>
+			<a
+				href={postUrl()}
+				target="_blank"
+				rel="noopener"
+				class="mt-3 inline-block text-sm text-[var(--accent)] underline"
+			>
+				View post ↗
+			</a>
+		</div>
+	{:else if card}
+		<!-- SVG preview -->
+		<div class="mt-4 overflow-hidden rounded border border-[var(--border)]">
+			{@html svgPreview}
+		</div>
+
+		{#if agent}
+			<!-- Authenticated: post it -->
+			<button
+				class="mt-6 w-full rounded bg-[var(--accent-dim)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--accent)]"
+				onclick={doPost}
+				disabled={posting}
+			>
+				{#if posting}
+					<span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+					Posting...
+				{:else}
+					Post to Bluesky
+				{/if}
+			</button>
+		{:else}
+			<!-- Not authenticated: sign in -->
+			<div class="mt-6 rounded border border-[var(--border)] bg-[var(--surface)] p-4">
+				<p class="text-sm text-[var(--text-muted)]">Sign in to post your personality profile.</p>
+
+				<label class="mt-3 block">
+					<span class="text-xs text-[var(--text-dim)]">Handle</span>
+					<input
+						type="text"
+						bind:value={handle}
+						placeholder="you.bsky.social"
+						autocomplete="username"
+						spellcheck="false"
+						class="mt-1 block w-full rounded border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-dim)] focus:border-[var(--accent)] focus:outline-none"
+						onkeydown={(e) => e.key === 'Enter' && !signingIn && handle && doSignIn()}
+					/>
+				</label>
+
+				<button
+					class="mt-3 w-full rounded bg-[var(--accent-dim)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--accent)] disabled:opacity-50"
+					onclick={doSignIn}
+					disabled={signingIn || !handle}
+				>
+					{#if signingIn}
+						Redirecting...
+					{:else}
+						Sign in with AT Protocol
+					{/if}
+				</button>
+
+				<p class="mt-2 text-center text-xs text-[var(--text-dim)]">
+					You'll be sent to your PDS to approve access, then returned here.
+				</p>
+			</div>
+		{/if}
+	{/if}
+
+	<div class="mt-6 text-center">
+		<a href="/" class="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]">← Back to tourmaline</a>
+	</div>
+</div>

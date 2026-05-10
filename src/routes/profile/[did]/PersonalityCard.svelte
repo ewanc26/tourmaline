@@ -1,10 +1,26 @@
 <script lang="ts">
+	import { Share2 } from '@lucide/svelte';
 	import { buildPersonality } from '$lib/analysis/personality';
 	import type { ListenerProfile } from '$lib/types';
 
 	let { profile, displayName }: { profile: ListenerProfile; displayName: string } = $props();
 
 	const personality = $derived(buildPersonality(profile));
+
+	const STORAGE_KEY = 'tourmaline:share';
+
+	function share() {
+		sessionStorage.setItem(
+			STORAGE_KEY,
+			JSON.stringify({
+				archetype: personality.archetype,
+				archetypeBlurb: personality.archetypeBlurb,
+				traits: personality.traits
+			})
+		);
+		const params = new URLSearchParams({ handle: profile.handle ?? '', did: profile.did });
+		window.location.href = `/share?${params}`;
+	}
 </script>
 
 <div class="rounded border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
@@ -26,4 +42,13 @@
 			</li>
 		{/each}
 	</ul>
+
+	<!-- Share button -->
+	<button
+		class="mt-6 flex w-full items-center justify-center gap-2 rounded border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-sm font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+		onclick={share}
+	>
+		<Share2 size={15} />
+		Share to Bluesky
+	</button>
 </div>
