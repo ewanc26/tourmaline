@@ -125,7 +125,9 @@ function parseScrobble(v: Record<string, unknown>): TealScrobble {
 		releaseMbId: v.releaseMbId as string | undefined,
 		duration: v.duration as number | undefined,
 		originUrl: v.originUrl as string | undefined,
-		playedTime: v.playedTime as string,
+		playedTime: typeof v.playedTime === 'string'
+			? v.playedTime
+			: new Date(v.playedTime as number).toISOString(),
 		submissionClientAgent: v.submissionClientAgent as string | undefined,
 		musicServiceBaseDomain: v.musicServiceBaseDomain as string | undefined,
 		trackDiscriminant: v.trackDiscriminant as string | undefined,

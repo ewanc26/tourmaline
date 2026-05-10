@@ -8,14 +8,14 @@
 import { BrowserOAuthClient } from '@atproto/oauth-client-browser';
 import { Agent } from '@atproto/api';
 
-const SCOPE = 'atproto';
+const SCOPE = 'atproto repo:app.bsky.feed.post blob:image/png';
 
 const CLIENT_ID = import.meta.env.DEV
 	? `http://localhost?${new URLSearchParams([
 			['redirect_uri', 'http://127.0.0.1:5173/share'],
 			['scope', SCOPE]
 		])}`
-	: 'https://tourmaline.croft.click/client-metadata.json';
+	: 'https://tourmaline.croft.click/oauth-client-metadata.json';
 
 let _client: Promise<BrowserOAuthClient> | null = null;
 
