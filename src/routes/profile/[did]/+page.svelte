@@ -19,6 +19,9 @@
 	import MoodRadar from './MoodRadar.svelte';
 	import EraBarChart from './EraBarChart.svelte';
 	import PersonalityCard from './PersonalityCard.svelte';
+	import ListeningClock from './ListeningClock.svelte';
+	import ListeningStats from './ListeningStats.svelte';
+	import ServiceOrigins from './ServiceOrigins.svelte';
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
@@ -166,7 +169,9 @@
 			diversityScore: 0,
 			giniCoefficient: 0,
 			obscurityIndex: 50,
-			mood: {}
+			mood: {},
+			scrobblesByHour: new Array(24).fill(0),
+			serviceOrigins: new Map()
 		};
 	}
 
@@ -200,7 +205,9 @@
 			diversityScore: diversity,
 			giniCoefficient: gini,
 			obscurityIndex: obscurity,
-			mood
+			mood,
+			scrobblesByHour: data.scrobblesByHour,
+			serviceOrigins: data.serviceOrigins
 		};
 	}
 
@@ -392,6 +399,21 @@
 			</div>
 		</div>
 
+		<!-- Listening stats (streaks, biggest day) -->
+		{#if profile.dailyScrobbles.length > 0}
+			<div class="mb-6 sm:mb-8">
+				<ListeningStats dailyScrobbles={profile.dailyScrobbles} totalScrobbles={profile.totalScrobbles} />
+			</div>
+		{/if}
+
+		<!-- Service origins -->
+		{#if profile.serviceOrigins.size > 0}
+			<div class="mb-6 sm:mb-8">
+				<p class="mb-2 font-mono text-xs uppercase tracking-wide text-[var(--text-dim)]">Scrobble sources</p>
+				<ServiceOrigins origins={profile.serviceOrigins} />
+			</div>
+		{/if}
+
 		<!-- Personality card -->
 		{#if profile.genres.length > 0}
 			<div class="mb-8">
@@ -415,6 +437,14 @@
 				</div>
 			{/if}
 		</div>
+
+		<!-- Listening clock -->
+		{#if profile.scrobblesByHour.some((n) => n > 0)}
+			<div class="mb-6 rounded border border-[var(--border)] bg-[var(--surface)] p-3 sm:mb-8 sm:p-4">
+				<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Listening Clock</h2>
+				<ListeningClock scrobblesByHour={profile.scrobblesByHour} />
+			</div>
+		{/if}
 
 		<!-- Timeline -->
 		{#if profile.timeline.length > 0}
