@@ -1,21 +1,31 @@
 /**
  * Converts an SVG string to a PNG Uint8Array using an offscreen canvas.
  * Runs in the browser only.
+ *
+ * The SVG viewBox height is dynamic (varies by number of traits, genres, moods).
+ * We parse it from the SVG string and scale to 2x for crisp output.
  */
 
-const WIDTH = 1200;
-const HEIGHT = 1240;
+const SCALE = 2;
+const SVG_WIDTH = 600;
 
 export function svgToPng(svgString: string): Promise<Uint8Array> {
 	return new Promise((resolve, reject) => {
+		// Parse the viewBox height from the SVG string
+		const viewBoxMatch = svgString.match(/viewBox="0 0 \d+ (\d+)"/);
+		const svgHeight = viewBoxMatch ? parseInt(viewBoxMatch[1], 10) : 620;
+
+		const canvasWidth = SVG_WIDTH * SCALE;
+		const canvasHeight = svgHeight * SCALE;
+
 		const blob = new Blob([svgString], { type: 'image/svg+xml' });
 		const url = URL.createObjectURL(blob);
 
 		const img = new Image();
 		img.onload = () => {
 			const canvas = document.createElement('canvas');
-			canvas.width = WIDTH;
-			canvas.height = HEIGHT;
+			canvas.width = canvasWidth;
+			canvas.height = canvasHeight;
 
 			const ctx = canvas.getContext('2d');
 			if (!ctx) {
@@ -24,8 +34,7 @@ export function svgToPng(svgString: string): Promise<Uint8Array> {
 				return;
 			}
 
-			// Scale up from SVG viewBox (600×620) to canvas (1200×1240)
-			ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
+			ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
 			URL.revokeObjectURL(url);
 
 			canvas.toBlob(
