@@ -36,6 +36,7 @@
 	},
 	"dependencies": {
 		"@ewanc26/noise-avatar": "^0.2.3",
+		"@lucide/svelte": "^1.14.0",
 		"better-sqlite3": "^12.9.0",
 		"chart.js": "^4.5.1"
 	}
