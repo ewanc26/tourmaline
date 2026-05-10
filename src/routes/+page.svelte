@@ -27,11 +27,13 @@
 	<meta property="og:url" content="https://tourmaline.croft.click" />
 	<meta property="og:title" content="Tourmaline — Teal.fm Scrobble Analyser" />
 	<meta property="og:description" content="Discover what kind of listener you are. Analyses your Teal.fm scrobbles — genres, moods, eras, obscurity, and a personality archetype." />
+	<meta property="og:image" content="https://tourmaline.croft.click/og.svg" />
 
 	<!-- Twitter / X card -->
-	<meta name="twitter:card" content="summary" />
+	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content="Tourmaline — Teal.fm Scrobble Analyser" />
 	<meta name="twitter:description" content="Discover what kind of listener you are. Analyses your Teal.fm scrobbles — genres, moods, eras, obscurity, and a personality archetype." />
+	<meta name="twitter:image" content="https://tourmaline.croft.click/og.svg" />
 </svelte:head>
 
 <main>
