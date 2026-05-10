@@ -64,6 +64,8 @@ export interface ListenerProfile {
 	giniCoefficient: number;
 	obscurityIndex: number;
 	mood: Record<string, number>;
+	scrobblesByHour: number[];
+	serviceOrigins: Map<string, number>;
 }
 
 export interface CacheEntry {
