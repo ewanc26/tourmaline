@@ -40,7 +40,7 @@
 		<div class="logo-wrap">
 			<img src="/logo.svg" alt="Tourmaline" width={120} height={120} />
 		</div>
-		<p class="wordmark">Tourmaline</p>
+		<p class="wordmark">tourmaline</p>
 		<p class="eyebrow">Open source · Read-only · No account needed</p>
 		<h1>Discover what kind of<br />listener you are.</h1>
 		<p class="sub">
