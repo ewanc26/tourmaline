@@ -16,7 +16,7 @@
 			</div>
 			<nav class="flex items-center gap-4 text-xs text-[var(--text-muted)]">
 				<a href="/about" class="hover:text-[var(--accent)]">About</a>
-				<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="hover:text-[var(--accent-pink)]">GitHub ↗</a>
+				<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="hover:text-[var(--accent)]">GitHub ↗</a>
 			</nav>
 		</div>
 	</header>

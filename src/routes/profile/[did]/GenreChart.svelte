@@ -15,15 +15,8 @@
 		const top = genres.slice(0, 12);
 		const maxWeight = top[0]?.weight ?? 1;
 
-		// Tourmaline pleochroic palette: green → pink gradient for genre bars
-	function genreColour(index: number, total: number): string {
-		const t = total > 1 ? index / (total - 1) : 0;
-		// Green (#4ade80) → Pink (#f472b6) interpolated via HSL
-		const h = 142 - t * 108; // 142 (green) → 34 (pink)
-		const s = 70 + t * 10;   // 70% → 80%
-		const l = 55 + t * 5;    // 55% → 60%
-		return `hsl(${h}, ${s}%, ${l}%)`;
-	}
+		// Tourmaline palette: green for bars
+	const BAR_COLOUR = '#4ade80';
 		// Show fewer genres on small screens
 		const isMobile = canvas.clientWidth < 400;
 		const display = isMobile ? top.slice(0, 8) : top;
@@ -32,7 +25,7 @@
 			// Update existing chart
 			chart.data.labels = display.map((g) => g.name);
 			chart.data.datasets[0].data = display.map((g) => Math.round((g.weight / maxWeight) * 100));
-			chart.data.datasets[0].backgroundColor = display.map((_, i) => genreColour(i, display.length));
+			chart.data.datasets[0].backgroundColor = display.map(() => BAR_COLOUR);
 			chart.update('none');
 			return;
 		}
@@ -44,7 +37,7 @@
 				datasets: [
 					{
 						data: display.map((g) => Math.round((g.weight / maxWeight) * 100)),
-						backgroundColor: display.map((_, i) => genreColour(i, display.length))
+						backgroundColor: display.map(() => BAR_COLOUR)
 					}
 				]
 			},

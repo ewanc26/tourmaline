@@ -24,7 +24,7 @@
 	<ul class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 		{#each personality.traits as trait (trait.label)}
 			<li class="rounded border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
-				<p class="font-mono text-xs uppercase tracking-wide text-[var(--accent-pink)]/60">{trait.label}</p>
+				<p class="font-mono text-xs uppercase tracking-wide text-[var(--accent-dim)]/60">{trait.label}</p>
 				<p class="mt-0.5 font-semibold text-[var(--text)]">{trait.value}</p>
 				<p class="mt-0.5 text-xs text-[var(--text-muted)]">{trait.detail}</p>
 			</li>

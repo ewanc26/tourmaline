@@ -9,14 +9,7 @@
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = $state(null);
 
-	// Tourmaline palette: green → pink gradient across decades
-	function eraColour(index: number, total: number): string {
-		const t = total > 1 ? index / (total - 1) : 0;
-		const h = 142 - t * 108;
-		const s = 60 + t * 10;
-		const l = 50 + t * 5;
-		return `hsl(${h}, ${s}%, ${l}%)`;
-	}
+	const BAR_COLOUR = '#4ade80';
 
 	$effect(() => {
 		if (!canvas || era.length === 0) return;
@@ -24,7 +17,7 @@
 		if (chart) {
 			chart.data.labels = era.map((e) => e.decade);
 			chart.data.datasets[0].data = era.map((e) => e.count);
-			chart.data.datasets[0].backgroundColor = era.map((_, i) => eraColour(i, era.length));
+			chart.data.datasets[0].backgroundColor = era.map(() => BAR_COLOUR);
 			chart.update('none');
 			return;
 		}
@@ -36,7 +29,7 @@
 				datasets: [
 					{
 						data: era.map((e) => e.count),
-						backgroundColor: era.map((_, i) => eraColour(i, era.length))
+						backgroundColor: era.map(() => BAR_COLOUR)
 					}
 				]
 			},

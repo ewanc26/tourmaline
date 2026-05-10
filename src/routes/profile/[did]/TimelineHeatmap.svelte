@@ -212,6 +212,6 @@
 	}
 
 	.square.bg-hot {
-		background: var(--gradient-accent);
+		background-color: var(--accent);
 	}
 </style>

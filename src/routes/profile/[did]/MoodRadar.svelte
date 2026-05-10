@@ -35,7 +35,7 @@
 					{
 						data: values,
 						backgroundColor: 'rgba(74, 222, 128, 0.15)',
-						borderColor: 'rgba(244, 114, 182, 0.6)',
+						borderColor: 'rgba(74, 222, 128, 0.6)',
 						pointBackgroundColor: 'rgba(74, 222, 128, 0.9)'
 					}
 				]

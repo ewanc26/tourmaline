@@ -218,10 +218,7 @@
 	.eyebrow {
 		font-size: 0.75rem;
 		font-family: 'JetBrains Mono', monospace;
-		background: var(--gradient-accent);
-		background-clip: text;
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
+		color: var(--accent);
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		margin: 0 0 1.25rem;
@@ -251,7 +248,7 @@
 	}
 
 	.sub a:hover {
-		color: var(--accent-pink);
+		color: var(--accent-bright);
 	}
 
 	.hero-form {
@@ -286,7 +283,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		background: var(--gradient-accent);
+		background: var(--accent-dim);
 		color: #fff;
 		font-weight: 600;
 		font-size: 0.9rem;
@@ -295,12 +292,11 @@
 		border: none;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: transform 0.1s, box-shadow 0.15s;
+		transition: background 0.15s, transform 0.1s;
 	}
 
 	.btn-primary:hover {
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(74, 222, 128, 0.25), 0 2px 6px rgba(244, 114, 182, 0.2);
+		background: var(--accent);
 	}
 
 	.btn-primary:disabled {
@@ -354,10 +350,6 @@
 		border-color: var(--accent);
 	}
 
-	.feature-card:nth-child(even):hover {
-		border-color: var(--accent-pink);
-	}
-
 	.feature-icon {
 		display: flex;
 		align-items: center;
@@ -365,12 +357,8 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 8px;
-		background: var(--gradient-accent-subtle);
+		background: var(--surface-2);
 		color: var(--accent);
-	}
-
-	.feature-card:nth-child(even) .feature-icon {
-		color: var(--accent-pink);
 	}
 
 	.feature-card h3 {
@@ -434,10 +422,6 @@
 		margin-top: 1px;
 	}
 
-	.steps-list li:nth-child(even) .step-num {
-		color: var(--accent-pink);
-	}
-
 	.steps-list strong {
 		display: block;
 		font-size: 0.9rem;
@@ -470,18 +454,6 @@
 		padding: 2.5rem;
 		text-align: center;
 		margin-bottom: 3rem;
-		position: relative;
-		overflow: hidden;
-	}
-
-	.cta::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 2px;
-		background: var(--gradient-accent);
 	}
 
 	.cta h2 {
