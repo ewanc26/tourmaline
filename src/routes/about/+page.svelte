@@ -122,8 +122,7 @@
 
 		<p class="flex items-center gap-1.5 text-sm text-gray-400">
 			<X size={16} />
-			<strong class="text-gray-200">Not analysed:</strong> Private/hidden scrobbles.
-			Only <code>fm.teal.alpha.feed.play</code> records visible on your PDS are read.
+			<span><strong class="text-gray-200">Not analysed:</strong> Private/hidden scrobbles. Only <code>fm.teal.alpha.feed.play</code> records visible on your PDS are read.</span>
 		</p>
 	</section>
 
