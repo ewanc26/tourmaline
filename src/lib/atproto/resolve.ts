@@ -19,15 +19,37 @@ export interface ProfileRecord {
 	avatar?: string;
 }
 
+/**
+ * Extract the CID from an avatar/banner blob reference.
+ * Raw profile records store blobs as { ref: { $link: 'cid...' } } objects,
+ * not as URLs. This pulls the CID out so we can build a fetchable URL.
+ */
+function extractBlobCid(blob: unknown): string | null {
+	if (!blob) return null;
+	if (typeof blob === 'string') return blob;
+	const obj = blob as Record<string, unknown>;
+	if (obj.ref && typeof obj.ref === 'object' && (obj.ref as Record<string, unknown>).$link) {
+		return (obj.ref as Record<string, unknown>).$link as string;
+	}
+	if (obj.cid) return obj.cid as string;
+	return null;
+}
+
 export async function fetchBlueskyProfile(pdsUrl: string, did: string): Promise<ProfileRecord> {
 	const url = `${pdsUrl}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=app.bsky.actor.profile&rkey=self`;
 	try {
 		const res = await fetch(url);
 		if (!res.ok) return {};
-		const data = (await res.json()) as { value?: { displayName?: string; avatar?: string } };
+		const data = (await res.json()) as { value?: { displayName?: string; avatar?: unknown } };
+
+		const avatarCid = extractBlobCid(data.value?.avatar);
+		const avatar = avatarCid
+			? `https://cdn.bsky.app/img/avatar/plain/${did}/${avatarCid}@jpeg`
+			: undefined;
+
 		return {
 			displayName: data.value?.displayName,
-			avatar: data.value?.avatar
+			avatar
 		};
 	} catch {
 		return {};
