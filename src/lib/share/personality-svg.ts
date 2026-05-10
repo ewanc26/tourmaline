@@ -51,7 +51,7 @@ export function renderPersonalitySvg(card: PersonalityCardData): string {
 		)
 		.join('');
 
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="620" viewBox="0 0 600 620">
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 620" width="100%" style="display:block">
 	<defs>
 		<style>${FONT_FACE_CSS}</style>
 	</defs>
