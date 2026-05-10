@@ -14,6 +14,7 @@
 	let card = $state<PersonalityCardData | null>(null);
 	let handle = $state('');
 	let svgPreview = $state('');
+	let profileUrl = $state('/');
 
 	let loading = $state(true);
 	let signingIn = $state(false);
@@ -37,11 +38,28 @@
 			error = 'No personality data found. Go back to your profile and try again.';
 		}
 
+		// Build a link back to the profile page
+		const params = new URLSearchParams(window.location.search);
+		const did = params.get('did');
+		const h = params.get('handle');
+		if (did || h) {
+			profileUrl = `/profile/${encodeURIComponent(did ?? h ?? '')}`;
+		}
+
 		// Try to restore an existing OAuth session
 		try {
 			agent = await initOAuth();
-		} catch (e) {
-			console.warn('[tourmaline] OAuth init failed:', e);
+		} catch (e: any) {
+			// OAuth init can fail if the user denied the authorization,
+			// the PDS is unreachable, or the session expired.
+			const msg = e?.message ?? String(e);
+			if (msg.includes('denied') || msg.includes('rejected') || msg.includes('unauthorized')) {
+				error = 'Authorisation was denied. You can try again or go back to your profile.';
+			} else if (msg.includes('network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
+				error = 'Could not reach your PDS. Check your connection and try again.';
+			}
+			// Silently ignore other init failures — the user just needs to sign in.
+			console.warn('[tourmaline] OAuth init:', msg);
 		}
 
 		loading = false;
@@ -54,7 +72,12 @@
 		try {
 			await signInWithOAuth(handle.trim());
 		} catch (e: any) {
-			error = e.message ?? 'OAuth sign-in failed';
+			const msg = e?.message ?? 'OAuth sign-in failed';
+			if (msg.includes('not found') || msg.includes('resolve')) {
+				error = 'Could not resolve that handle. Check it and try again.';
+			} else {
+				error = msg;
+			}
 			signingIn = false;
 		}
 	}
@@ -69,7 +92,16 @@
 			done = true;
 			sessionStorage.removeItem(STORAGE_KEY);
 		} catch (e: any) {
-			error = e.message ?? 'Failed to post';
+			const msg = e?.message ?? 'Failed to post';
+			if (msg.includes('blob') || msg.includes('upload')) {
+				error = 'Failed to upload the image. Your PDS may not have accepted the blob.';
+			} else if (msg.includes('record') || msg.includes('validation')) {
+				error = 'The post record was rejected by your PDS.';
+			} else if (msg.includes('network') || msg.includes('fetch')) {
+				error = 'Network error while posting. Check your connection and try again.';
+			} else {
+				error = msg;
+			}
 		} finally {
 			posting = false;
 		}
@@ -93,7 +125,7 @@
 	<h1 class="text-lg font-bold text-[var(--text)]">Share to Bluesky</h1>
 
 	{#if error}
-		<div class="mt-4 rounded border border-[var(--error)]/30 bg-[var(--error)]/10 p-3 text-sm text-[var(--error)]">
+		<div class="mt-4 rounded border border-red-800/30 bg-red-900/20 p-3 text-sm text-red-400">
 			{error}
 		</div>
 	{/if}
@@ -174,6 +206,6 @@
 	{/if}
 
 	<div class="mt-6 text-center">
-		<a href="/" class="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]">← Back to tourmaline</a>
+		<a href={profileUrl} class="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]">← Back to profile</a>
 	</div>
 </div>
