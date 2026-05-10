@@ -1,5 +1,5 @@
 import type { AggregatedData } from './aggregator';
-import type { ArtistInfo, GenreEntry } from '$lib/types';
+import type { ArtistInfo, GenreEntry, MonthlyGenre } from '$lib/types';
 import GENRE_MAP from '$lib/data/genre-map.json';
 
 /**
@@ -168,6 +168,48 @@ export function buildGenreProfile(
 		.map(([name, weight]) => ({ name, weight }))
 		.sort((a, b) => b.weight - a.weight)
 		.slice(0, 20);
+}
+
+/**
+ * Build per-month genre distributions using monthlyArtistPlays.
+ * Returns months sorted chronologically, each with their top genres.
+ */
+export function buildMonthlyGenres(
+	data: AggregatedData,
+	artistInfos: Map<string, ArtistInfo>
+): MonthlyGenre[] {
+	const result: MonthlyGenre[] = [];
+
+	for (const [month, artistPlays] of [...data.monthlyArtistPlays.entries()].sort(([a], [b]) =>
+		a.localeCompare(b)
+	)) {
+		const genreWeights = new Map<string, number>();
+
+		for (const [artistName, count] of artistPlays) {
+			const info = artistInfos.get(artistName);
+			if (!info) continue;
+			const allRaw = [...info.genres, ...info.tags];
+			const seen = new Set<string>();
+			for (const raw of allRaw) {
+				const normalised = normaliseGenre(raw);
+				if (!normalised || seen.has(normalised)) continue;
+				seen.add(normalised);
+				genreWeights.set(normalised, (genreWeights.get(normalised) ?? 0) + count);
+			}
+		}
+
+		if (genreWeights.size > 0) {
+			result.push({
+				month,
+				genres: [...genreWeights.entries()]
+					.map(([name, weight]) => ({ name, weight }))
+					.sort((a, b) => b.weight - a.weight)
+					.slice(0, 6)
+			});
+		}
+	}
+
+	return result;
 }
 
 export { normaliseGenre, CATEGORIES };

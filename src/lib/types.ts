@@ -47,12 +47,33 @@ export interface EraEntry {
 	count: number;
 }
 
+export interface MonthlyGenre {
+	month: string; // YYYY-MM
+	genres: GenreEntry[];
+}
+
+export interface RemarkableDay {
+	date: string;
+	type: 'biggest' | 'discovery' | 'nostalgic' | 'artist' | 'genre' | 'unusual';
+	title: string;
+	detail: string;
+	count: number;
+}
+
+export interface DiscoveredArtist {
+	name: string;
+	firstListen: string; // YYYY-MM-DD
+	count: number;
+	imageUrl?: string;
+}
+
 export interface ListenerProfile {
 	did: string;
 	handle?: string;
 	totalScrobbles: number;
 	uniqueArtists: number;
 	uniqueTracks: number;
+	totalMinutes: number;
 	topArtists: Array<{ name: string; count: number; imageUrl?: string }>;
 	topTracks: Array<{ name: string; artist: string; count: number }>;
 	topAlbums: Array<{ name: string; artist: string; count: number }>;
@@ -66,6 +87,9 @@ export interface ListenerProfile {
 	mood: Record<string, number>;
 	scrobblesByHour: number[];
 	serviceOrigins: Map<string, number>;
+	monthlyGenres: MonthlyGenre[];
+	remarkableDays: RemarkableDay[];
+	discoveredArtists: DiscoveredArtist[];
 }
 
 export interface CacheEntry {

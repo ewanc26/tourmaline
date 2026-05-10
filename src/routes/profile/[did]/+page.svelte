@@ -2,12 +2,14 @@
 	import { onMount } from 'svelte';
 	import { resolveIdentifier, fetchScrobblesBatched, fetchBlueskyProfile } from '$lib/atproto/resolve';
 	import { Aggregator } from '$lib/analysis/aggregator';
-	import { buildGenreProfile } from '$lib/analysis/genres';
+	import { buildGenreProfile, buildMonthlyGenres } from '$lib/analysis/genres';
 	import { buildTimeline } from '$lib/analysis/timeline';
 	import { diversityScore, calculateGini } from '$lib/analysis/diversity';
 	import { calculateObscurity } from '$lib/analysis/obscurity';
 	import { buildMoodProfile } from '$lib/analysis/mood';
 	import { buildEraProfile } from '$lib/analysis/era';
+	import { buildRemarkableDays } from '$lib/analysis/remarkable-days';
+	import { buildDiscoveredArtists } from '$lib/analysis/discovery';
 	import { enrichArtist } from '$lib/enrich/musicbrainz';
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
@@ -22,6 +24,11 @@
 	import ListeningClock from './ListeningClock.svelte';
 	import ListeningStats from './ListeningStats.svelte';
 	import ServiceOrigins from './ServiceOrigins.svelte';
+	import MinutesListened from './MinutesListened.svelte';
+	import MusicEvolution from './MusicEvolution.svelte';
+	import RemarkableDays from './RemarkableDays.svelte';
+	import Discovery from './Discovery.svelte';
+	import YearlyWrapped from './YearlyWrapped.svelte';
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
@@ -159,6 +166,7 @@
 			totalScrobbles: 0,
 			uniqueArtists: 0,
 			uniqueTracks: 0,
+			totalMinutes: 0,
 			topArtists: [],
 			topTracks: [],
 			topAlbums: [],
@@ -171,7 +179,10 @@
 			obscurityIndex: 50,
 			mood: {},
 			scrobblesByHour: new Array(24).fill(0),
-			serviceOrigins: new Map()
+			serviceOrigins: new Map(),
+			monthlyGenres: [],
+			remarkableDays: [],
+			discoveredArtists: []
 		};
 	}
 
@@ -183,6 +194,9 @@
 		const obscurity = calculateObscurity(data, artistInfos);
 		const mood = buildMoodProfile(data, artistInfos);
 		const era = buildEraProfile(data, artistInfos);
+		const monthlyGenres = buildMonthlyGenres(data, artistInfos);
+		const remarkableDays = buildRemarkableDays(data);
+		const discoveredArtists = buildDiscoveredArtists(data, artistInfos);
 
 		profile = {
 			did,
@@ -190,6 +204,7 @@
 			totalScrobbles: data.totalScrobbles,
 			uniqueArtists: data.uniqueArtists,
 			uniqueTracks: data.uniqueTracks,
+			totalMinutes: data.totalMinutes,
 			topArtists: data.topArtists.map((a) => ({
 				...a,
 				imageUrl: artistInfos.get(a.name)?.imageUrl
@@ -207,7 +222,10 @@
 			obscurityIndex: obscurity,
 			mood,
 			scrobblesByHour: data.scrobblesByHour,
-			serviceOrigins: data.serviceOrigins
+			serviceOrigins: data.serviceOrigins,
+			monthlyGenres,
+			remarkableDays,
+			discoveredArtists
 		};
 	}
 
@@ -399,6 +417,13 @@
 			</div>
 		</div>
 
+		<!-- Minutes listened hero -->
+		{#if profile.totalMinutes > 0}
+			<div class="mb-6 sm:mb-8">
+				<MinutesListened minutes={profile.totalMinutes} />
+			</div>
+		{/if}
+
 		<!-- Listening stats (streaks, biggest day) -->
 		{#if profile.dailyScrobbles.length > 0}
 			<div class="mb-6 sm:mb-8">
@@ -462,6 +487,27 @@
 			</div>
 		{/if}
 
+		<!-- Remarkable days -->
+		{#if profile.remarkableDays.length > 0}
+			<div class="mb-6 sm:mb-8">
+				<RemarkableDays days={profile.remarkableDays} />
+			</div>
+		{/if}
+
+		<!-- Music evolution -->
+		{#if profile.monthlyGenres.length >= 3}
+			<div class="mb-6 sm:mb-8">
+				<MusicEvolution monthlyGenres={profile.monthlyGenres} />
+			</div>
+		{/if}
+
+		<!-- Discovery -->
+		{#if profile.discoveredArtists.length > 0}
+			<div class="mb-6 sm:mb-8">
+				<Discovery artists={profile.discoveredArtists} />
+			</div>
+		{/if}
+
 		<!-- Top artists -->
 		<div class="mb-6 overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)] p-3 sm:mb-8 sm:p-4">
 			<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Top Artists</h2>
@@ -514,6 +560,11 @@
 					{/each}
 				</ol>
 			</div>
+		</div>
+
+		<!-- Yearly wrapped card -->
+		<div class="mt-8">
+			<YearlyWrapped profile={profile} displayName={bskyDisplayName ?? handle ?? did} />
 		</div>
 	{/if}
 </div>
