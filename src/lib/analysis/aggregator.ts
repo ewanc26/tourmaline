@@ -2,6 +2,7 @@ import type { TealScrobble } from '$lib/types';
 
 export interface AggregatedData {
 	totalScrobbles: number;
+	totalMinutes: number;
 	uniqueArtists: number;
 	uniqueTracks: number;
 	topArtists: Array<{ name: string; count: number }>;
@@ -14,7 +15,11 @@ export interface AggregatedData {
 	scrobblesByDay: number[];
 	scrobblesByHourDay: number[][];
 	dailyScrobbles: Map<string, number>; // YYYY-MM-DD → count
+	monthlyScrobbles: Map<string, number>; // YYYY-MM → count
 	serviceOrigins: Map<string, number>;
+	artistFirstListen: Map<string, string>; // artist → earliest YYYY-MM-DD
+	/** YYYY-MM → (artist name → play count that month) */
+	monthlyArtistPlays: Map<string, Map<string, number>>;
 }
 
 const TRACK_KEY = (s: TealScrobble) =>
@@ -35,6 +40,10 @@ export class Aggregator {
 	private byDay = new Array(7).fill(0) as number[];
 	private byHourDay = Array.from({ length: 7 }, () => new Array(24).fill(0) as number[]);
 	private dailyCounts = new Map<string, number>();
+	private monthlyCounts = new Map<string, number>();
+	private monthlyArtistCounts = new Map<string, Map<string, number>>();
+	private firstListenMap = new Map<string, string>(); // artist → earliest YYYY-MM-DD
+	private minutesCount = 0;
 	private total = 0;
 
 	add(scrobbles: TealScrobble[]): void {
@@ -70,6 +79,9 @@ export class Aggregator {
 				}
 			}
 
+			// Duration (seconds → minutes; default 3.5 min if absent)
+			this.minutesCount += (scrobble.duration ?? 210) / 60;
+
 			const date = new Date(scrobble.playedTime);
 			if (isNaN(date.getTime())) continue;
 			const hour = date.getHours();
@@ -80,6 +92,23 @@ export class Aggregator {
 
 			const dateKey = scrobble.playedTime.substring(0, 10); // YYYY-MM-DD
 			this.dailyCounts.set(dateKey, (this.dailyCounts.get(dateKey) ?? 0) + 1);
+
+			const monthKey = dateKey.substring(0, 7); // YYYY-MM
+			this.monthlyCounts.set(monthKey, (this.monthlyCounts.get(monthKey) ?? 0) + 1);
+
+			// Monthly artist plays
+			let monthArtists = this.monthlyArtistCounts.get(monthKey);
+			if (!monthArtists) {
+				monthArtists = new Map<string, number>();
+				this.monthlyArtistCounts.set(monthKey, monthArtists);
+			}
+			monthArtists.set(artistName, (monthArtists.get(artistName) ?? 0) + 1);
+
+			// First listen per artist (keep the earliest date)
+			const prevFirstListen = this.firstListenMap.get(artistName);
+			if (!prevFirstListen || dateKey < prevFirstListen) {
+				this.firstListenMap.set(artistName, dateKey);
+			}
 
 			if (scrobble.musicServiceBaseDomain) {
 				const domain = scrobble.musicServiceBaseDomain;
@@ -104,6 +133,7 @@ export class Aggregator {
 
 		return {
 			totalScrobbles: this.total,
+			totalMinutes: Math.round(this.minutesCount),
 			uniqueArtists: this.artistCounts.size,
 			uniqueTracks: this.trackCounts.size,
 			topArtists,
@@ -116,6 +146,9 @@ export class Aggregator {
 			scrobblesByDay: [...this.byDay],
 			scrobblesByHourDay: this.byHourDay.map((d) => [...d]),
 			dailyScrobbles: new Map(this.dailyCounts),
+			monthlyScrobbles: new Map(this.monthlyCounts),
+			artistFirstListen: this.firstListenMap,
+			monthlyArtistPlays: this.monthlyArtistCounts,
 			serviceOrigins: this.serviceOrigins
 		};
 	}
