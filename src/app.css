@@ -1,1 +1,47 @@
 @import 'tailwindcss';
+
+/* Tourmaline colour palette — chrome green + rubellite pink */
+:root {
+	/* Backgrounds — dark with green undertone */
+	--bg: #0a0f0a;
+	--surface: #0f170f;
+	--surface-2: #151f15;
+
+	/* Borders */
+	--border: #1a2b1a;
+	--border-subtle: #141f14;
+
+	/* Primary accent — chrome tourmaline green */
+	--accent: #4ade80;
+	--accent-bright: #86efac;
+	--accent-dim: #22c55e;
+
+	/* Secondary accent — rubellite pink */
+	--accent-pink: #f472b6;
+	--accent-pink-bright: #f9a8d4;
+	--accent-pink-dim: #ec4899;
+
+	/* Gradients */
+	--gradient-accent: linear-gradient(135deg, #4ade80 0%, #f472b6 100%);
+	--gradient-accent-subtle: linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(244, 114, 182, 0.15) 100%);
+
+	/* Text */
+	--text: #e5e7eb;
+	--text-muted: #9ca3af;
+	--text-dim: #6b7280;
+
+	/* Functional */
+	--error: #f87171;
+	--warn: #fbbf24;
+}
+
+/* Apply to Tailwind */
+@theme {
+	--color-bg: var(--bg);
+	--color-surface: var(--surface);
+	--color-surface-2: var(--surface-2);
+	--color-border: var(--border);
+	--color-accent: var(--accent);
+	--color-accent-pink: var(--accent-pink);
+}
+

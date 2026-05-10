@@ -68,12 +68,12 @@
 
 	function cellColour(count: number): string {
 		if (count < 0) return '';
-		if (count === 0) return 'bg-gray-800';
+		if (count === 0) return 'bg-empty';
 		const intensity = count / maxCount;
-		if (intensity > 0.75) return 'bg-green-400';
-		if (intensity > 0.5) return 'bg-green-500';
-		if (intensity > 0.25) return 'bg-green-600';
-		return 'bg-green-700';
+		if (intensity > 0.75) return 'bg-hot';
+		if (intensity > 0.5) return 'bg-med';
+		if (intensity > 0.25) return 'bg-low';
+		return 'bg-dim';
 	}
 
 	function formatDate(dateStr: string): string {
@@ -137,7 +137,7 @@
 
 	.month-label {
 		font-size: 0.625rem;
-		color: #9ca3af;
+		color: var(--text-muted);
 	}
 
 	@media (min-width: 640px) {
@@ -163,7 +163,7 @@
 		display: flex;
 		align-items: center;
 		font-size: 0.625rem;
-		color: #9ca3af;
+		color: var(--text-muted);
 		height: 0.75rem;
 	}
 
@@ -194,23 +194,24 @@
 		border-radius: 0.125rem;
 	}
 
-	.square.bg-gray-800 {
-		background-color: #1f2937;
+	/* Heatmap colours — green to pink gradient (tourmaline pleochroism) */
+	.square.bg-empty {
+		background-color: var(--surface-2);
 	}
 
-	.square.bg-green-400 {
-		background-color: #4ade80;
+	.square.bg-dim {
+		background-color: #15803d;
 	}
 
-	.square.bg-green-500 {
-		background-color: #22c55e;
-	}
-
-	.square.bg-green-600 {
+	.square.bg-low {
 		background-color: #16a34a;
 	}
 
-	.square.bg-green-700 {
-		background-color: #15803d;
+	.square.bg-med {
+		background-color: var(--accent-dim);
+	}
+
+	.square.bg-hot {
+		background: var(--gradient-accent);
 	}
 </style>
