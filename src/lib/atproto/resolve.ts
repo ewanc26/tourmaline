@@ -137,12 +137,17 @@ function parseScrobble(v: Record<string, unknown>): TealScrobble {
  * Fetch scrobbles page by page, calling onBatch after each page.
  * The callback may be async — it is awaited before fetching the next page,
  * so callers can tick() or otherwise flush the UI between batches.
+ *
+ * If `since` is provided, fetching stops once a scrobble with
+ * playedTime <= since is encountered (records come in reverse chronological
+ * order from the PDS, so this is the natural boundary).
  */
 export async function fetchScrobblesBatched(
 	pdsUrl: string,
 	did: string,
 	onBatch: (batch: TealScrobble[], totalSoFar: number) => void | Promise<void>,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	since?: string
 ): Promise<TealScrobble[]> {
 	const limit = 100;
 	let cursor: string | undefined;
@@ -166,9 +171,17 @@ export async function fetchScrobblesBatched(
 
 		const data: ListRecordsResponse = await res.json();
 		const batch: TealScrobble[] = [];
+		let hitCursor = false;
 
 		for (const record of data.records) {
 			const scrobble = parseScrobble(record.value);
+
+			// Stop if we've reached scrobbles we already have
+			if (since && scrobble.playedTime <= since) {
+				hitCursor = true;
+				break;
+			}
+
 			batch.push(scrobble);
 			allScrobbles.push(scrobble);
 		}
@@ -178,7 +191,7 @@ export async function fetchScrobblesBatched(
 		}
 
 		cursor = data.cursor;
-		if (!cursor || data.records.length === 0) break;
+		if (!cursor || data.records.length === 0 || hitCursor) break;
 	}
 
 	return allScrobbles;
