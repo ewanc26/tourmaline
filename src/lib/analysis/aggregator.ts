@@ -71,6 +71,7 @@ export class Aggregator {
 			}
 
 			const date = new Date(scrobble.playedTime);
+			if (isNaN(date.getTime())) continue;
 			const hour = date.getHours();
 			const day = date.getDay();
 			this.byHour[hour]++;
