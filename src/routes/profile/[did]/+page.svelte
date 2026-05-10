@@ -305,22 +305,22 @@
 	<meta name="description" content="Listening profile for {bskyDisplayName ?? handle ?? did}" />
 </svelte:head>
 
-<div class="mx-auto max-w-6xl px-4 py-8">
-	<header class="mb-8">
+<div class="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-8">
+	<header class="mb-6 sm:mb-8">
 		<a href="/" class="text-sm text-gray-400 hover:text-white">&larr; Back</a>
-		<div class="mt-2 flex items-center gap-4">
+		<div class="mt-2 flex items-center gap-3 sm:gap-4">
 			{#if bskyAvatar}
-				<img src={bskyAvatar} alt="" class="h-12 w-12 rounded-full border border-gray-700" />
+				<img src={bskyAvatar} alt="" class="h-10 w-10 shrink-0 rounded-full border border-gray-700 sm:h-12 sm:w-12" />
 			{/if}
-			<div>
-				<h1 class="text-2xl font-bold">
+			<div class="min-w-0">
+				<h1 class="truncate text-xl font-bold sm:text-2xl">
 					{bskyDisplayName ?? handle ?? did}
 				</h1>
 				{#if bskyDisplayName && handle}
-					<p class="text-sm text-gray-400">@{handle}</p>
+					<p class="truncate text-sm text-gray-400">@{handle}</p>
 				{/if}
 				{#if did}
-					<p class="mt-0.5 font-mono text-xs text-gray-500">{did}</p>
+					<p class="mt-0.5 truncate font-mono text-xs text-gray-500">{did}</p>
 				{/if}
 			</div>
 		</div>
@@ -369,22 +369,22 @@
 	<!-- Profile content — live updates as data streams in -->
 	{#if profile && profile.totalScrobbles > 0}
 		<!-- Stats row -->
-		<div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-			<div class="rounded border border-gray-700 bg-gray-800 p-4">
+		<div class="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 sm:grid-cols-4">
+			<div class="rounded border border-gray-700 bg-gray-800 px-3 py-3 sm:p-4">
 				<p class="text-xs text-gray-400">Scrobbles</p>
-				<p class="text-2xl font-bold">{profile.totalScrobbles.toLocaleString()}</p>
+				<p class="text-xl font-bold sm:text-2xl">{profile.totalScrobbles.toLocaleString()}</p>
 			</div>
-			<div class="rounded border border-gray-700 bg-gray-800 p-4">
+			<div class="rounded border border-gray-700 bg-gray-800 px-3 py-3 sm:p-4">
 				<p class="text-xs text-gray-400">Unique Artists</p>
-				<p class="text-2xl font-bold">{profile.uniqueArtists.toLocaleString()}</p>
+				<p class="text-xl font-bold sm:text-2xl">{profile.uniqueArtists.toLocaleString()}</p>
 			</div>
-			<div class="rounded border border-gray-700 bg-gray-800 p-4">
+			<div class="rounded border border-gray-700 bg-gray-800 px-3 py-3 sm:p-4">
 				<p class="text-xs text-gray-400">Diversity</p>
-				<p class="text-2xl font-bold">{profile.diversityScore}<span class="text-sm text-gray-400">/100</span></p>
+				<p class="text-xl font-bold sm:text-2xl">{profile.diversityScore}<span class="text-sm text-gray-400">/100</span></p>
 			</div>
-			<div class="rounded border border-gray-700 bg-gray-800 p-4">
+			<div class="rounded border border-gray-700 bg-gray-800 px-3 py-3 sm:p-4">
 				<p class="text-xs text-gray-400">Obscurity</p>
-				<p class="text-2xl font-bold">{profile.obscurityIndex}<span class="text-sm text-gray-400">/100</span></p>
+				<p class="text-xl font-bold sm:text-2xl">{profile.obscurityIndex}<span class="text-sm text-gray-400">/100</span></p>
 			</div>
 		</div>
 
@@ -396,17 +396,17 @@
 		{/if}
 
 		<!-- Charts row -->
-		<div class="mb-8 grid gap-8 lg:grid-cols-2">
+		<div class="mb-6 grid gap-4 sm:mb-8 sm:gap-8 lg:grid-cols-2">
 			{#if profile.genres.length > 0}
-				<div class="rounded border border-gray-700 bg-gray-800 p-4">
-					<h2 class="mb-4 text-lg font-semibold">Genre Profile</h2>
+				<div class="rounded border border-gray-700 bg-gray-800 p-3 sm:p-4">
+					<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Genre Profile</h2>
 					<GenreChart genres={profile.genres} />
 				</div>
 			{/if}
 
 			{#if Object.keys(profile.mood).length > 0}
-				<div class="rounded border border-gray-700 bg-gray-800 p-4">
-					<h2 class="mb-4 text-lg font-semibold">Mood Profile</h2>
+				<div class="rounded border border-gray-700 bg-gray-800 p-3 sm:p-4">
+					<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Mood Profile</h2>
 					<MoodRadar mood={profile.mood} />
 				</div>
 			{/if}
@@ -414,68 +414,68 @@
 
 		<!-- Timeline -->
 		{#if profile.timeline.length > 0}
-			<div class="mb-8 rounded border border-gray-700 bg-gray-800 p-4">
-				<h2 class="mb-4 text-lg font-semibold">Listening Timeline</h2>
+			<div class="mb-6 rounded border border-gray-700 bg-gray-800 p-3 sm:mb-8 sm:p-4">
+				<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Listening Timeline</h2>
 				<TimelineHeatmap dailyScrobbles={profile.dailyScrobbles} />
 			</div>
 		{/if}
 
 		<!-- Era -->
 		{#if profile.era.length > 0}
-			<div class="mb-8 rounded border border-gray-700 bg-gray-800 p-4">
-				<h2 class="mb-4 text-lg font-semibold">Era Preference</h2>
+			<div class="mb-6 rounded border border-gray-700 bg-gray-800 p-3 sm:mb-8 sm:p-4">
+				<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Era Preference</h2>
 				<EraBarChart era={profile.era} />
 			</div>
 		{/if}
 
 		<!-- Top artists -->
-		<div class="mb-8 rounded border border-gray-700 bg-gray-800 p-4">
-			<h2 class="mb-4 text-lg font-semibold">Top Artists</h2>
+		<div class="mb-6 rounded border border-gray-700 bg-gray-800 p-3 sm:mb-8 sm:p-4">
+			<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Top Artists</h2>
 			<ol class="space-y-2">
 				{#each profile.topArtists.slice(0, 25) as artist, i (artist.name)}
-					<li class="flex items-center gap-3">
-						<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
+					<li class="flex items-center gap-2 sm:gap-3">
+						<span class="w-5 shrink-0 text-right text-xs text-gray-400 sm:w-6 sm:text-sm">{i + 1}</span>
 						{#if artist.imageUrl}
-							<img src={artist.imageUrl} alt={artist.name} class="h-8 w-8 rounded" />
+							<img src={artist.imageUrl} alt={artist.name} class="h-7 w-7 shrink-0 rounded sm:h-8 sm:w-8" />
 						{:else}
-							<canvas use:noiseAvatar={artist.name} class="h-8 w-8 rounded"></canvas>
+							<canvas use:noiseAvatar={artist.name} class="h-7 w-7 shrink-0 rounded sm:h-8 sm:w-8"></canvas>
 						{/if}
-						<span class="flex-1 truncate">{artist.name}</span>
-						<span class="font-mono text-sm text-gray-400">{artist.count.toLocaleString()}</span>
+						<span class="min-w-0 flex-1 truncate">{artist.name}</span>
+						<span class="shrink-0 font-mono text-xs text-gray-400 sm:text-sm">{artist.count.toLocaleString()}</span>
 					</li>
 				{/each}
 			</ol>
 		</div>
 
 		<!-- Top tracks + albums side by side -->
-		<div class="grid gap-8 lg:grid-cols-2">
-			<div class="rounded border border-gray-700 bg-gray-800 p-4">
-				<h2 class="mb-4 text-lg font-semibold">Top Tracks</h2>
+		<div class="grid gap-4 sm:gap-8 lg:grid-cols-2">
+			<div class="rounded border border-gray-700 bg-gray-800 p-3 sm:p-4">
+				<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Top Tracks</h2>
 				<ol class="space-y-2">
 					{#each profile.topTracks.slice(0, 25) as track, i (i)}
-						<li class="flex items-center gap-3">
-							<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
-							<span class="flex-1 truncate">
+						<li class="flex items-center gap-2 sm:gap-3">
+							<span class="w-5 shrink-0 text-right text-xs text-gray-400 sm:w-6 sm:text-sm">{i + 1}</span>
+							<span class="min-w-0 flex-1 truncate">
 								<span class="font-medium">{track.name}</span>
-								<span class="text-sm text-gray-400"> — {track.artist}</span>
+								<span class="text-xs text-gray-400 sm:text-sm"> — {track.artist}</span>
 							</span>
-							<span class="font-mono text-sm text-gray-400">{track.count.toLocaleString()}</span>
+							<span class="shrink-0 font-mono text-xs text-gray-400 sm:text-sm">{track.count.toLocaleString()}</span>
 						</li>
 					{/each}
 				</ol>
 			</div>
 
-			<div class="rounded border border-gray-700 bg-gray-800 p-4">
-				<h2 class="mb-4 text-lg font-semibold">Top Albums</h2>
+			<div class="rounded border border-gray-700 bg-gray-800 p-3 sm:p-4">
+				<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Top Albums</h2>
 				<ol class="space-y-2">
 					{#each profile.topAlbums.slice(0, 25) as album, i (i)}
-						<li class="flex items-center gap-3">
-							<span class="w-6 text-right text-sm text-gray-400">{i + 1}</span>
-							<span class="flex-1 truncate">
+						<li class="flex items-center gap-2 sm:gap-3">
+							<span class="w-5 shrink-0 text-right text-xs text-gray-400 sm:w-6 sm:text-sm">{i + 1}</span>
+							<span class="min-w-0 flex-1 truncate">
 								<span class="font-medium">{album.name}</span>
-								<span class="text-sm text-gray-400"> — {album.artist}</span>
+								<span class="text-xs text-gray-400 sm:text-sm"> — {album.artist}</span>
 							</span>
-							<span class="font-mono text-sm text-gray-400">{album.count.toLocaleString()}</span>
+							<span class="shrink-0 font-mono text-xs text-gray-400 sm:text-sm">{album.count.toLocaleString()}</span>
 						</li>
 					{/each}
 				</ol>

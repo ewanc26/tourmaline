@@ -13,10 +13,16 @@
 
 		const labels = Object.keys(mood);
 		const values = Object.values(mood);
+		const isMobile = canvas.clientWidth < 400;
 
 		if (chart) {
 			chart.data.labels = labels;
 			chart.data.datasets[0].data = values;
+			// Type-safe update: pointLabels is a radar scale property
+			const rScale = chart.options.scales?.r as { pointLabels?: { font?: { size?: number } } } | undefined;
+			if (rScale?.pointLabels?.font) {
+				rScale.pointLabels.font.size = isMobile ? 9 : 11;
+			}
 			chart.update();
 			return;
 		}
@@ -45,9 +51,9 @@
 					r: {
 						beginAtZero: true,
 						max: 100,
-						ticks: { color: '#9ca3af', backdropColor: 'transparent' },
+						ticks: { color: '#9ca3af', backdropColor: 'transparent', font: { size: 10 } },
 						grid: { color: 'rgba(255,255,255,0.1)' },
-						pointLabels: { color: '#e5e7eb', font: { size: 11 } },
+						pointLabels: { color: '#e5e7eb', font: { size: isMobile ? 9 : 11 } },
 						angleLines: { color: 'rgba(255,255,255,0.1)' }
 					}
 				}
@@ -56,6 +62,6 @@
 	});
 </script>
 
-<div class="h-80">
+<div class="h-64 sm:h-80">
 	<canvas bind:this={canvas}></canvas>
 </div>

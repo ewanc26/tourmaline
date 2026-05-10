@@ -119,7 +119,13 @@
 			"empty months"
 			"days squares";
 		grid-template-columns: auto 1fr;
-		gap: 6px;
+		gap: 4px;
+	}
+
+	@media (min-width: 640px) {
+		.graph {
+			gap: 6px;
+		}
 	}
 
 	.month-labels {
@@ -130,32 +136,58 @@
 	}
 
 	.month-label {
-		font-size: 0.75rem;
+		font-size: 0.625rem;
 		color: #9ca3af;
+	}
+
+	@media (min-width: 640px) {
+		.month-label {
+			font-size: 0.75rem;
+		}
 	}
 
 	.day-labels {
 		grid-area: days;
 		display: grid;
 		grid-template-rows: repeat(7, 1fr);
-		gap: 3px;
+		gap: 2px;
+	}
+
+	@media (min-width: 640px) {
+		.day-labels {
+			gap: 3px;
+		}
 	}
 
 	.day-labels div {
 		display: flex;
 		align-items: center;
-		font-size: 0.75rem;
+		font-size: 0.625rem;
 		color: #9ca3af;
-		height: 1rem;
+		height: 0.75rem;
+	}
+
+	@media (min-width: 640px) {
+		.day-labels div {
+			font-size: 0.75rem;
+			height: 1rem;
+		}
 	}
 
 	.squares {
 		grid-area: squares;
 		display: grid;
-		grid-template-rows: repeat(7, 1rem);
+		grid-template-rows: repeat(7, 0.75rem);
 		grid-auto-flow: column;
 		grid-auto-columns: 1fr;
-		gap: 3px;
+		gap: 2px;
+	}
+
+	@media (min-width: 640px) {
+		.squares {
+			grid-template-rows: repeat(7, 1rem);
+			gap: 3px;
+		}
 	}
 
 	.square {

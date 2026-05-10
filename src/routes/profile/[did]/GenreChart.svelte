@@ -15,11 +15,15 @@
 		const top = genres.slice(0, 12);
 		const maxWeight = top[0]?.weight ?? 1;
 
+		// Show fewer genres on small screens
+		const isMobile = canvas.clientWidth < 400;
+		const display = isMobile ? top.slice(0, 8) : top;
+
 		if (chart) {
 			// Update existing chart
-			chart.data.labels = top.map((g) => g.name);
-			chart.data.datasets[0].data = top.map((g) => Math.round((g.weight / maxWeight) * 100));
-			chart.data.datasets[0].backgroundColor = top.map((_, i) => {
+			chart.data.labels = display.map((g) => g.name);
+			chart.data.datasets[0].data = display.map((g) => Math.round((g.weight / maxWeight) * 100));
+			chart.data.datasets[0].backgroundColor = display.map((_, i) => {
 				const hue = (i * 30) % 360;
 				return `hsl(${hue}, 70%, 55%)`;
 			});
@@ -30,11 +34,11 @@
 		chart = new Chart(canvas, {
 			type: 'bar',
 			data: {
-				labels: top.map((g) => g.name),
+				labels: display.map((g) => g.name),
 				datasets: [
 					{
-						data: top.map((g) => Math.round((g.weight / maxWeight) * 100)),
-						backgroundColor: top.map((_, i) => {
+						data: display.map((g) => Math.round((g.weight / maxWeight) * 100)),
+						backgroundColor: display.map((_, i) => {
 							const hue = (i * 30) % 360;
 							return `hsl(${hue}, 70%, 55%)`;
 						})
@@ -57,11 +61,11 @@
 				scales: {
 					x: {
 						max: 100,
-						ticks: { color: '#9ca3af' },
+						ticks: { color: '#9ca3af', font: { size: 11 } },
 						grid: { color: 'rgba(255,255,255,0.05)' }
 					},
 					y: {
-						ticks: { color: '#e5e7eb' },
+						ticks: { color: '#e5e7eb', font: { size: 11 } },
 						grid: { display: false }
 					}
 				}
@@ -70,6 +74,6 @@
 	});
 </script>
 
-<div class="h-80">
+<div class="h-64 sm:h-80">
 	<canvas bind:this={canvas}></canvas>
 </div>
