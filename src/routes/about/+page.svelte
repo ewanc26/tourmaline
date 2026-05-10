@@ -160,7 +160,7 @@
 			</div>
 			<div class="flex gap-3">
 				<a href="https://github.com/ewanc26" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">GitHub</a>
-				<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">Ko-fi</a>
+				<a href="https://ewancroft.uk/support" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">Support</a>
 				<a href="https://ewancroft.uk" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">Website</a>
 			</div>
 		</div>
@@ -216,7 +216,7 @@
 	<footer class="mt-8 text-center text-xs text-[var(--text-dim)]">
 		<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]"><ExternalLink size={12} /> View on GitHub</a>
 		<span class="mx-1">·</span>
-		<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]"><Heart size={12} /> Support Tourmaline</a>
+		<a href="https://ewancroft.uk/support" class="inline-flex items-center gap-1 text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]"><Heart size={12} /> Support Tourmaline</a>
 	</footer>
 </div>
 
