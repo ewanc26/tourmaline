@@ -28,23 +28,27 @@ export function calculateDiversity(data: AggregatedData): number {
  * Gini coefficient — measures inequality.
  * 0 = perfectly equal distribution, 1 = all plays go to one artist.
  * Lower = more diverse.
+ *
+ * Uses the O(n log n) sorted-array formula rather than the naive O(n²)
+ * double-loop, which becomes expensive at a few thousand artists.
+ *
+ * Formula (1-indexed, ascending sort):
+ *   G = (2 * Σ i·xᵢ) / (n · Σ xᵢ) - (n + 1) / n
  */
 export function calculateGini(data: AggregatedData): number {
 	const counts = [...data.artistPlayCounts.values()].sort((a, b) => a - b);
 	const n = counts.length;
 	if (n === 0) return 0;
 
-	let sumOfAbsDiffs = 0;
+	const sum = counts.reduce((a, b) => a + b, 0);
+	if (sum === 0) return 0;
+
+	let weightedSum = 0;
 	for (let i = 0; i < n; i++) {
-		for (let j = 0; j < n; j++) {
-			sumOfAbsDiffs += Math.abs(counts[i] - counts[j]);
-		}
+		weightedSum += (i + 1) * counts[i];
 	}
 
-	const mean = counts.reduce((a, b) => a + b, 0) / n;
-	if (mean === 0) return 0;
-
-	return sumOfAbsDiffs / (2 * n * n * mean);
+	return (2 * weightedSum) / (n * sum) - (n + 1) / n;
 }
 
 /**
