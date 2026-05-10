@@ -105,7 +105,7 @@
 			{#each cells as cell}
 				<div
 					class="square {cellColour(cell.count)}"
-					title={cell.date ? "{formatDate(cell.date)} — {cell.count} scrobble{cell.count !== 1 ? 's' : ''}" : ''}
+					title={cell.date ? `${formatDate(cell.date)} — ${cell.count} scrobble${cell.count !== 1 ? 's' : ''}` : ''}
 				></div>
 			{/each}
 		</div>
