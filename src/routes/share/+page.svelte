@@ -150,7 +150,7 @@
 		</div>
 	{:else if card}
 		<!-- SVG preview -->
-		<div class="mt-4 overflow-hidden rounded border border-[var(--border)]">
+		<div class="mt-4 rounded border border-[var(--border)]">
 			{@html svgPreview}
 		</div>
 
