@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { resolveIdentifier, fetchScrobblesBatched } from '$lib/atproto/resolve';
+	import { resolveIdentifier, fetchScrobblesBatched, fetchBlueskyProfile } from '$lib/atproto/resolve';
 	import { Aggregator } from '$lib/analysis/aggregator';
 	import { buildGenreProfile } from '$lib/analysis/genres';
 	import { buildTimeline } from '$lib/analysis/timeline';
@@ -32,6 +32,8 @@
 	let phase = $state<'idle' | 'resolving' | 'fetching' | 'enriching' | 'complete' | 'error'>('idle');
 	let did = $state('');
 	let handle = $state<string | undefined>();
+	let bskyDisplayName = $state<string | undefined>();
+	let bskyAvatar = $state<string | undefined>();
 	let loaded = $state(0);
 	let enrichProgress = $state({ current: 0, total: 0 });
 	let error = $state('');
@@ -199,6 +201,12 @@
 			profile = emptyProfile(did, handle);
 			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${identity.pdsUrl}`);
 
+			// Fetch Bluesky profile for display name and avatar
+			const bskyProfile = await fetchBlueskyProfile(identity.pdsUrl, did);
+			bskyDisplayName = bskyProfile.displayName;
+			bskyAvatar = bskyProfile.avatar;
+			console.log(`[tourmaline] bsky profile → displayName: ${bskyDisplayName ?? '(none)'}, avatar: ${bskyAvatar ? 'yes' : 'no'}`);
+
 			// 2. Fetch scrobbles
 			phase = 'fetching';
 			const fetchStart = performance.now();
@@ -243,19 +251,29 @@
 </script>
 
 <svelte:head>
-	<title>{handle ?? did} — Tourmaline</title>
-	<meta name="description" content="Listening profile for {handle ?? did}" />
+	<title>{bskyDisplayName ?? handle ?? did} — Tourmaline</title>
+	<meta name="description" content="Listening profile for {bskyDisplayName ?? handle ?? did}" />
 </svelte:head>
 
 <div class="mx-auto max-w-6xl px-4 py-8">
 	<header class="mb-8">
 		<a href="/" class="text-sm text-gray-400 hover:text-white">&larr; Back</a>
-		<h1 class="mt-2 text-2xl font-bold">
-			{handle ?? did}
-		</h1>
-		{#if did}
-			<p class="mt-1 font-mono text-xs text-gray-500">{did}</p>
-		{/if}
+		<div class="mt-2 flex items-center gap-4">
+			{#if bskyAvatar}
+				<img src={bskyAvatar} alt="" class="h-12 w-12 rounded-full border border-gray-700" />
+			{/if}
+			<div>
+				<h1 class="text-2xl font-bold">
+					{bskyDisplayName ?? handle ?? did}
+				</h1>
+				{#if bskyDisplayName && handle}
+					<p class="text-sm text-gray-400">@{handle}</p>
+				{/if}
+				{#if did}
+					<p class="mt-0.5 font-mono text-xs text-gray-500">{did}</p>
+				{/if}
+			</div>
+		</div>
 	</header>
 
 	<!-- Loading state -->
@@ -319,7 +337,7 @@
 		<!-- Personality card -->
 		{#if profile.genres.length > 0}
 			<div class="mb-8">
-				<PersonalityCard profile={profile} displayName={handle ?? did} />
+				<PersonalityCard profile={profile} displayName={bskyDisplayName ?? handle ?? did} />
 			</div>
 		{/if}
 
