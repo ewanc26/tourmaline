@@ -1,7 +1,7 @@
 import { getCached, setCache } from './cache';
 import type { ArtistInfo } from '$lib/types';
 
-const USER_AGENT = 'Tourmaline/0.2.0 (https://github.com/ewanc26/tourmaline)';
+const USER_AGENT = 'Tourmaline/0.3.0 (https://github.com/ewanc26/tourmaline)';
 
 // Rate limiting is handled server-side by the /api/musicbrainz proxy.
 // Client just fires requests — the server queues them at 1 req/s.
