@@ -11,7 +11,8 @@
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
 	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
-	import type { ArtistInfo, ListenerProfile } from '$lib/types';
+	import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
+	import { getCached as getIdbCache, setCached as setIdbCache } from '$lib/cache/client';
 	import GenreChart from './GenreChart.svelte';
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
 	import MoodRadar from './MoodRadar.svelte';
@@ -30,6 +31,7 @@
 	let { data }: { data: { lastfmApiKey: string | null } } = $props();
 
 	let phase = $state<'idle' | 'resolving' | 'fetching' | 'enriching' | 'complete' | 'error'>('idle');
+	let fromCache = $state(false);
 	let did = $state('');
 	let handle = $state<string | undefined>();
 	let bskyDisplayName = $state<string | undefined>();
@@ -40,6 +42,23 @@
 	let profile = $state<ListenerProfile | null>(null);
 
 	const artistInfos = new Map<string, ArtistInfo>();
+
+	/** Write scrobbles + cursor to both IndexedDB and server cache. */
+	async function writeCache(did: string, scrobbles: TealScrobble[], cursor: string): Promise<void> {
+		// IndexedDB (client-side)
+		await setIdbCache(did, { cursor, scrobbles, fetchedAt: Date.now() });
+
+		// Server SQLite
+		try {
+			await fetch('/api/scrobbles/cache', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ did, scrobbles, cursor })
+			});
+		} catch {
+			// server cache write is non-critical
+		}
+	}
 
 	/** Yield to the browser so it can paint before we continue. */
 	function yieldFrame(): Promise<void> {
@@ -190,6 +209,8 @@
 
 		const aggregator = new Aggregator();
 		const t0 = performance.now();
+		let pdsUrl = '';
+		let cursor: string | undefined;
 
 		try {
 			// 1. Resolve identity
@@ -198,30 +219,59 @@
 			const identity = await resolveIdentifier(identifier);
 			did = identity.did;
 			handle = identity.handle;
+			pdsUrl = identity.pdsUrl;
 			profile = emptyProfile(did, handle);
-			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${identity.pdsUrl}`);
+			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${pdsUrl}`);
 
 			// Fetch Bluesky profile for display name and avatar
-			const bskyProfile = await fetchBlueskyProfile(identity.pdsUrl, did);
+			const bskyProfile = await fetchBlueskyProfile(pdsUrl, did);
 			bskyDisplayName = bskyProfile.displayName;
 			bskyAvatar = bskyProfile.avatar;
 			console.log(`[tourmaline] bsky profile → displayName: ${bskyDisplayName ?? '(none)'}, avatar: ${bskyAvatar ? 'yes' : 'no'}`);
 
-			// 2. Fetch scrobbles
+			// 2. Check client-side cache
+			const cached = await getIdbCache(did);
+			if (cached && cached.scrobbles.length > 0) {
+				fromCache = true;
+				aggregator.add(cached.scrobbles);
+				loaded = cached.scrobbles.length;
+				cursor = cached.cursor;
+				updateProfile(aggregator.snapshot());
+				phase = 'complete';
+				console.log(`[tourmaline] loaded ${cached.scrobbles.length} scrobbles from cache (cursor: ${cursor})`);
+			}
+
+			// 3. Fetch scrobbles from PDS (incremental if cache hit)
 			phase = 'fetching';
 			const fetchStart = performance.now();
-			await fetchScrobblesBatched(identity.pdsUrl, did, async (batch, totalSoFar) => {
-				aggregator.add(batch);
-				loaded = totalSoFar;
-				updateProfile(aggregator.snapshot());
-				await yieldFrame();
-			});
-			console.log(`[tourmaline] fetched ${loaded} scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
+			const newScrobbles = await fetchScrobblesBatched(
+				pdsUrl,
+				did,
+				async (batch, totalSoFar) => {
+					aggregator.add(batch);
+					loaded = totalSoFar;
+					updateProfile(aggregator.snapshot());
+					await yieldFrame();
+				},
+				undefined,
+				cursor
+			);
+			console.log(`[tourmaline] fetched ${newScrobbles.length} new scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
 
-			// 3. Enrich top artists — 6 concurrent workers
-			// Server-side rate limiting in the proxy routes handles API pacing.
-			// MusicBrainz: 1 req/s, Last.fm: 5 req/s, Deezer: no limit.
-			// 6 workers means ~6 artists processed in parallel (each hits all 3 APIs).
+			// Update the cursor to the most recent scrobble
+			if (newScrobbles.length > 0) {
+				cursor = newScrobbles[0].playedTime;
+			}
+
+			// Write back to both caches
+			const allScrobbles = cached
+				? [...newScrobbles, ...cached.scrobbles]
+				: [...newScrobbles];
+			if (allScrobbles.length > 0 && cursor) {
+				await writeCache(did, allScrobbles, cursor);
+			}
+
+			// 4. Enrich top artists — 6 concurrent workers
 			phase = 'enriching';
 			const topArtists = aggregator.snapshot().topArtists;
 			enrichProgress = { current: 0, total: topArtists.length };
@@ -287,12 +337,16 @@
 			{:else if phase === 'fetching'}
 				<div class="flex items-center gap-3">
 					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-					<span class="text-sm text-gray-300">Fetching scrobbles...</span>
+					<span class="text-sm text-gray-300">
+						{fromCache ? 'Checking for new scrobbles...' : 'Fetching scrobbles...'}
+					</span>
 				</div>
-				<div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-700">
-					<div class="h-full rounded-full bg-green-600 transition-all duration-300" style="width: {loaded > 0 ? '100' : '0'}%"></div>
-				</div>
-				<p class="mt-2 text-xs text-gray-500">{loaded.toLocaleString()} scrobbles loaded</p>
+				{#if !fromCache}
+					<div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-700">
+						<div class="h-full rounded-full bg-green-600 transition-all duration-300" style="width: {loaded > 0 ? '100' : '0'}%"></div>
+					</div>
+					<p class="mt-2 text-xs text-gray-500">{loaded.toLocaleString()} scrobbles loaded</p>
+				{/if}
 			{:else if phase === 'enriching'}
 				<div class="flex items-center gap-3">
 					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
