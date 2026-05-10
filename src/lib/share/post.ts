@@ -21,6 +21,11 @@ export async function sharePersonality(
 	const svg = renderPersonalitySvg(card);
 	const pngBytes = await svgToPng(svg);
 
+	// Parse SVG dimensions for aspect ratio
+	const viewBoxMatch = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
+	const svgW = viewBoxMatch ? parseInt(viewBoxMatch[1], 10) : 600;
+	const svgH = viewBoxMatch ? parseInt(viewBoxMatch[2], 10) : 620;
+
 	// 2. Upload the image blob
 	const { data: blobData } = await agent.uploadBlob(pngBytes, {
 		encoding: 'image/png'
@@ -43,8 +48,8 @@ export async function sharePersonality(
 					alt: `${card.archetype} — personality profile from tourmaline`,
 					image: blobData.blob,
 					aspectRatio: {
-						width: 1200,
-						height: 1240
+						width: svgW,
+						height: svgH
 					}
 				}
 			]
