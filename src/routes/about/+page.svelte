@@ -160,7 +160,7 @@
 			</div>
 			<div class="flex gap-3">
 				<a href="https://github.com/ewanc26" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">GitHub</a>
-				<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent-pink)]">Ko-fi</a>
+				<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">Ko-fi</a>
 				<a href="https://ewancroft.uk" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">Website</a>
 			</div>
 		</div>
@@ -216,7 +216,7 @@
 	<footer class="mt-8 text-center text-xs text-[var(--text-dim)]">
 		<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">↗ View on GitHub</a>
 		<span class="mx-1">·</span>
-		<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent-pink)]">♥ Support Tourmaline</a>
+		<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">♥ Support Tourmaline</a>
 	</footer>
 </div>
 
@@ -304,7 +304,7 @@
 		border-radius: 999px;
 		border: 1px solid rgba(74, 222, 128, 0.35);
 		color: var(--accent);
-		background: var(--gradient-accent-subtle);
+		background: rgba(74, 222, 128, 0.08);
 	}
 
 	.check-list {
@@ -319,10 +319,6 @@
 		gap: 0.5rem;
 		padding: 0.4rem 0;
 		color: var(--accent);
-	}
-
-	.check-list li:nth-child(even) {
-		color: var(--accent-pink);
 	}
 
 	.steps-list {
@@ -356,10 +352,6 @@
 		font-family: 'JetBrains Mono', monospace;
 		color: var(--accent);
 		flex-shrink: 0;
-	}
-
-	.steps-list li:nth-child(even) .step-num {
-		color: var(--accent-pink);
 	}
 
 	.steps-list strong {
@@ -403,7 +395,7 @@
 	}
 
 	.deps a:hover {
-		color: var(--accent-pink);
+		color: var(--accent);
 	}
 
 	@media (max-width: 480px) {
