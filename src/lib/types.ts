@@ -23,6 +23,7 @@ export interface ArtistInfo {
 	listenerCount?: number;
 	playCount?: number;
 	imageUrl?: string;
+	startYear?: number;
 }
 
 export interface GenreEntry {
@@ -60,6 +61,7 @@ export interface ListenerProfile {
 	dailyScrobbles: DailyScrobble[];
 	era: EraEntry[];
 	diversityScore: number;
+	giniCoefficient: number;
 	obscurityIndex: number;
 	mood: Record<string, number>;
 }

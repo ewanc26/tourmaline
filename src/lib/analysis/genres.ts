@@ -140,7 +140,8 @@ function normaliseGenre(tag: string): Category | null {
 
 /**
  * Build the genre profile from aggregated data and enriched artist info.
- * Genres and tags are both normalised to top-level categories.
+ * Uses the full artistPlayCounts map (not just top-50) to capture
+ * the long tail of less-played genres.
  */
 export function buildGenreProfile(
 	data: AggregatedData,
@@ -148,7 +149,7 @@ export function buildGenreProfile(
 ): GenreEntry[] {
 	const genreWeights = new Map<Category, number>();
 
-	for (const { name, count } of data.topArtists) {
+	for (const [name, count] of data.artistPlayCounts) {
 		const info = artistInfos.get(name);
 		if (!info) continue;
 
