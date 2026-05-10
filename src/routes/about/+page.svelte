@@ -9,7 +9,7 @@
 
 <div class="mx-auto max-w-2xl px-3 py-8 sm:px-4">
 
-	<h1 class="text-2xl font-bold tracking-tight">About Tourmaline</h1>
+	<h1 class="text-2xl font-bold tracking-tight text-[var(--text)]">About Tourmaline</h1>
 
 	<!-- ── Privacy & data ─────────────────────────────────────────────────── -->
 	<section>
@@ -120,9 +120,9 @@
 			<li><Check size={16} /> Listener personality archetype</li>
 		</ul>
 
-		<p class="flex items-center gap-1.5 text-sm text-gray-400">
+		<p class="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
 			<X size={16} />
-			<span><strong class="text-gray-200">Not analysed:</strong> Private/hidden scrobbles. Only <code>fm.teal.alpha.feed.play</code> records visible on your PDS are read.</span>
+			<span><strong class="text-[var(--text)]">Not analysed:</strong> Private/hidden scrobbles. Only <code>fm.teal.alpha.feed.play</code> records visible on your PDS are read.</span>
 		</p>
 	</section>
 
@@ -155,20 +155,20 @@
 		<h3>Created by</h3>
 		<div class="person-card">
 			<div class="flex flex-col gap-0.5">
-				<span class="text-sm font-medium text-gray-100">Ewan Croft</span>
-				<span class="text-xs text-gray-400">Author &amp; maintainer</span>
+				<span class="text-sm font-medium text-[var(--text)]">Ewan Croft</span>
+				<span class="text-xs text-[var(--text-muted)]">Author &amp; maintainer</span>
 			</div>
 			<div class="flex gap-3">
-				<a href="https://github.com/ewanc26" target="_blank" rel="noopener" class="text-xs text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-green-400">GitHub</a>
-				<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-xs text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-green-400">Ko-fi</a>
-				<a href="https://ewancroft.uk" target="_blank" rel="noopener" class="text-xs text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-green-400">Website</a>
+				<a href="https://github.com/ewanc26" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">GitHub</a>
+				<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent-pink)]">Ko-fi</a>
+				<a href="https://ewancroft.uk" target="_blank" rel="noopener" class="text-xs text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">Website</a>
 			</div>
 		</div>
 
 		<h3>Contributors</h3>
-		<p class="text-sm text-gray-400">
+		<p class="text-sm text-[var(--text-muted)]">
 			Contributions via
-			<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-green-400">GitHub</a>
+			<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">GitHub</a>
 			are always welcome. The full contributor list is maintained there.
 		</p>
 
@@ -213,10 +213,10 @@
 		</ul>
 	</section>
 
-	<footer class="mt-8 text-center text-xs text-gray-500">
-		<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-green-400">↗ View on GitHub</a>
+	<footer class="mt-8 text-center text-xs text-[var(--text-dim)]">
+		<a href="https://github.com/ewanc26/tourmaline" target="_blank" rel="noopener" class="text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent)]">↗ View on GitHub</a>
 		<span class="mx-1">·</span>
-		<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-gray-400 underline decoration-gray-600 underline-offset-2 hover:text-green-400">♥ Support Tourmaline</a>
+		<a href="https://ko-fi.com/ewancroft" target="_blank" rel="noopener" class="text-[var(--text-muted)] underline decoration-[var(--border)] underline-offset-2 hover:text-[var(--accent-pink)]">♥ Support Tourmaline</a>
 	</footer>
 </div>
 
@@ -224,7 +224,7 @@
 	section {
 		margin-bottom: 2.5rem;
 		padding-bottom: 2.5rem;
-		border-bottom: 1px solid #374151;
+		border-bottom: 1px solid var(--border);
 	}
 
 	section:last-of-type {
@@ -238,7 +238,7 @@
 	h2 {
 		font-size: 1rem;
 		font-weight: 500;
-		color: #e5e7eb;
+		color: var(--text);
 		margin-bottom: 1rem;
 		letter-spacing: -0.01em;
 	}
@@ -246,7 +246,7 @@
 	h3 {
 		font-size: 0.825rem;
 		font-weight: 500;
-		color: #9ca3af;
+		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		margin: 1.5rem 0 0.75rem;
@@ -258,7 +258,7 @@
 
 	p {
 		font-size: 0.875rem;
-		color: #9ca3af;
+		color: var(--text-muted);
 		line-height: 1.7;
 		margin-bottom: 0.75rem;
 	}
@@ -270,31 +270,31 @@
 
 	li {
 		font-size: 0.875rem;
-		color: #9ca3af;
+		color: var(--text-muted);
 		line-height: 1.7;
 		margin-bottom: 0.4rem;
 	}
 
 	strong {
-		color: #e5e7eb;
+		color: var(--text);
 		font-weight: 500;
 	}
 
 	:global(code) {
 		font-family: 'JetBrains Mono', monospace;
 		font-size: 0.82em;
-		color: #4ade80;
-		background: #111827;
+		color: var(--accent);
+		background: var(--surface);
 		padding: 0.1em 0.35em;
 		border-radius: 3px;
 	}
 
 	a {
-		color: #9ca3af;
+		color: var(--text-muted);
 	}
 
 	a:hover {
-		color: #4ade80;
+		color: var(--accent);
 	}
 
 	.pill {
@@ -303,8 +303,8 @@
 		padding: 0.2rem 0.6rem;
 		border-radius: 999px;
 		border: 1px solid rgba(74, 222, 128, 0.35);
-		color: #4ade80;
-		background: rgba(74, 222, 128, 0.08);
+		color: var(--accent);
+		background: var(--gradient-accent-subtle);
 	}
 
 	.check-list {
@@ -318,7 +318,11 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.4rem 0;
-		color: #4ade80;
+		color: var(--accent);
+	}
+
+	.check-list li:nth-child(even) {
+		color: var(--accent-pink);
 	}
 
 	.steps-list {
@@ -332,7 +336,7 @@
 		gap: 1rem;
 		align-items: flex-start;
 		padding: 0.75rem 0;
-		border-bottom: 1px solid #374151;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.steps-list li:last-child {
@@ -343,28 +347,32 @@
 		width: 24px;
 		height: 24px;
 		border-radius: 50%;
-		background: #111827;
-		border: 1.5px solid #374151;
+		background: var(--surface);
+		border: 1.5px solid var(--border);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		font-size: 0.7rem;
 		font-family: 'JetBrains Mono', monospace;
-		color: #4ade80;
+		color: var(--accent);
 		flex-shrink: 0;
+	}
+
+	.steps-list li:nth-child(even) .step-num {
+		color: var(--accent-pink);
 	}
 
 	.steps-list strong {
 		display: block;
 		font-size: 0.85rem;
 		font-weight: 500;
-		color: #e5e7eb;
+		color: var(--text);
 		margin-bottom: 0.15rem;
 	}
 
 	.steps-list p {
 		font-size: 0.825rem;
-		color: #9ca3af;
+		color: var(--text-muted);
 		line-height: 1.5;
 		margin: 0;
 	}
@@ -374,8 +382,8 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		background: #111827;
-		border: 1px solid #374151;
+		background: var(--surface);
+		border: 1px solid var(--border);
 		border-radius: 8px;
 		padding: 0.875rem 1rem;
 	}
@@ -387,11 +395,15 @@
 
 	.deps li {
 		padding: 0.5rem 0;
-		border-bottom: 1px solid #374151;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.deps li:last-child {
 		border-bottom: none;
+	}
+
+	.deps a:hover {
+		color: var(--accent-pink);
 	}
 
 	@media (max-width: 480px) {

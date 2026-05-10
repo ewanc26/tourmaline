@@ -34,9 +34,9 @@
 				datasets: [
 					{
 						data: values,
-						backgroundColor: 'rgba(74, 222, 128, 0.2)',
-						borderColor: 'rgba(74, 222, 128, 0.8)',
-						pointBackgroundColor: 'rgba(74, 222, 128, 1)'
+						backgroundColor: 'rgba(74, 222, 128, 0.15)',
+						borderColor: 'rgba(244, 114, 182, 0.6)',
+						pointBackgroundColor: 'rgba(74, 222, 128, 0.9)'
 					}
 				]
 			},
