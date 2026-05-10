@@ -16,6 +16,7 @@
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
 	import MoodRadar from './MoodRadar.svelte';
 	import EraBarChart from './EraBarChart.svelte';
+	import PersonalityCard from './PersonalityCard.svelte';
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
@@ -314,6 +315,13 @@
 				<p class="text-2xl font-bold">{profile.obscurityIndex}<span class="text-sm text-gray-400">/100</span></p>
 			</div>
 		</div>
+
+		<!-- Personality card -->
+		{#if profile.genres.length > 0}
+			<div class="mb-8">
+				<PersonalityCard profile={profile} displayName={handle ?? did} />
+			</div>
+		{/if}
 
 		<!-- Charts row -->
 		<div class="mb-8 grid gap-8 lg:grid-cols-2">
