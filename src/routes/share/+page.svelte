@@ -109,11 +109,9 @@
 
 	function postUrl(): string {
 		if (!postUri) return '';
-		// at://did:plc:.../app.bsky.feed.post/rkey → https://bsky.app/profile/did/rkey
-		const parts = postUri.split('/');
-		const did = parts[2];
-		const rkey = parts[4];
-		return `https://bsky.app/profile/${did}/post/${rkey}`;
+		// at://did:plc:.../collection/rkey → https://aturi.to/did:plc:.../collection/rkey
+		const uri = postUri.replace('at://', '');
+		return `https://aturi.to/${uri}`;
 	}
 </script>
 
