@@ -30,7 +30,7 @@
 		<ul>
 			<li>
 				<strong>Slingshot</strong> (<code>slingshot.microcosm.blue</code>) — resolves your
-				Bluesky handle to a DID and PDS URL. This is a standard identity lookup. No
+				AT Protocol handle to a DID and PDS URL. This is a standard identity lookup. No
 				personally identifiable data beyond your handle is sent.
 			</li>
 			<li>

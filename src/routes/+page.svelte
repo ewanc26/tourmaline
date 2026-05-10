@@ -129,7 +129,7 @@
 				<span class="step-num">1</span>
 				<div>
 					<strong>Enter a handle</strong>
-					<p>Any Bluesky handle or DID. No sign-in, no app password.</p>
+					<p>Any AT Protocol handle or DID. No sign-in, no app password.</p>
 				</div>
 			</li>
 			<li>
@@ -168,7 +168,7 @@
 	<!-- ── CTA ──────────────────────────────────────────────────────────────── -->
 	<section class="cta">
 		<h2>Try it</h2>
-		<p>Enter any Bluesky handle or DID. No account needed.</p>
+		<p>Enter any AT Protocol handle or DID. No account needed.</p>
 		<form onsubmit={(e) => { e.preventDefault(); analyse(); }} class="cta-form">
 			<input
 				type="text"
