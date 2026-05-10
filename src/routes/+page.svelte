@@ -188,6 +188,29 @@
 			</button>
 		</form>
 	</section>
+
+	<!-- ── More tools ─────────────────────────────────────────────────────── -->
+	<section class="siblings">
+		<h2>More tools</h2>
+		<div class="siblings-grid">
+			<a href="https://malachite.croft.click" class="sibling-card">
+				<strong>Malachite</strong>
+				<p>Import Last.fm and Spotify listening history into Teal.</p>
+			</a>
+			<a href="https://opal.croft.click" class="sibling-card">
+				<strong>Opal</strong>
+				<p>Convert Twitter, Mastodon, Threads, and Nostr posts to Bluesky.</p>
+			</a>
+			<a href="https://jasper.croft.click" class="sibling-card">
+				<strong>Jasper</strong>
+				<p>Import Instagram photos and videos to Grain or Spark.</p>
+			</a>
+			<a href="https://bismuth.croft.click" class="sibling-card">
+				<strong>Bismuth</strong>
+				<p>Convert ATProto richtext-block documents to Markdown.</p>
+			</a>
+		</div>
+	</section>
 </main>
 
 <style>
@@ -473,6 +496,47 @@
 		gap: 0.5rem;
 		max-width: 480px;
 		margin: 0 auto;
+	}
+
+	/* ── More tools ──────────────────────────────────────────────────────── */
+	.siblings {
+		margin-bottom: 3rem;
+	}
+
+	.siblings-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.sibling-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 1rem 1.25rem;
+		text-decoration: none;
+		transition: border-color 0.15s, transform 0.1s;
+	}
+
+	.sibling-card:hover {
+		border-color: var(--accent);
+		transform: translateY(-1px);
+	}
+
+	.sibling-card strong {
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--text);
+	}
+
+	.sibling-card p {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		line-height: 1.5;
+		margin: 0;
 	}
 
 	/* ── Responsive ───────────────────────────────────────────────────────── */
