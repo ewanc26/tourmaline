@@ -78,49 +78,58 @@
 		await setIdbCache(did, { cursor, scrobbles, fetchedAt: Date.now() });
 	}
 
-	/** Compute the profile on the server by POSTing scrobbles + enrichment. */
-	async function computeServerProfile(range?: DateRangePreset): Promise<void> {
-		if (!did || rawScrobbles.length === 0) return;
-		const rangeParam = range ?? dateRange;
-		const url = `/api/profile/${encodeURIComponent(did)}?range=${rangeParam}`;
-
-		// Strip scrobbles down to fields the server needs — reduces payload ~60%
-		const strippedScrobbles = rawScrobbles.map((s) => ({
-			playedTime: s.playedTime,
-			trackName: s.trackName,
-			releaseName: s.releaseName ?? undefined,
-			artists: [{ name: s.artists[0]?.name ?? 'Unknown' }],
-			duration: s.duration,
-			service: s.service
-		}));
-
-		// Serialise enrichment data the client has gathered so far
-		const enrichment: Record<string, ArtistInfo> = {};
-		for (const [name, info] of artistInfos) {
-			enrichment[name] = info;
-		}
-
-		try {
-			const res = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					scrobbles: strippedScrobbles,
-					enrichment: Object.keys(enrichment).length > 0 ? enrichment : undefined
-				})
-			});
-			if (!res.ok) return;
-			const body = await res.json();
-			if (body.profile) {
-				profile = body.profile;
-				sessionStats = body.sessionStats ?? null;
-				onThisDayEntries = body.onThisDay ?? [];
-				storyRecap_ = body.storyRecap ?? null;
-				personality = body.personality ?? null;
+	/** Compute the profile in a web worker — off the main thread, no body size limits. */
+	function computeWorkerProfile(range?: DateRangePreset): Promise<void> {
+		return new Promise((resolve) => {
+			if (!did || rawScrobbles.length === 0) {
+				resolve();
+				return;
 			}
-		} catch {
-			// server profile compute failure — keep existing profile
-		}
+
+			const worker = new Worker(
+				new URL('$lib/analysis/worker.ts', import.meta.url),
+				{ type: 'module' }
+			);
+
+			// Strip scrobbles to fields the worker needs
+			const strippedScrobbles = rawScrobbles.map((s) => ({
+				playedTime: s.playedTime,
+				trackName: s.trackName,
+				releaseName: s.releaseName ?? undefined,
+				artists: [{ name: s.artists[0]?.name ?? 'Unknown' }],
+				duration: s.duration,
+				musicServiceBaseDomain: s.musicServiceBaseDomain
+			}));
+
+			// Serialise enrichment data gathered so far
+			const enrichment: Record<string, ArtistInfo> = {};
+			for (const [name, info] of artistInfos) {
+				enrichment[name] = info;
+			}
+
+			worker.onmessage = (e) => {
+				profile = e.data.profile;
+				sessionStats = e.data.sessionStats ?? null;
+				onThisDayEntries = e.data.onThisDay ?? [];
+				storyRecap_ = e.data.storyRecap ?? null;
+				personality = e.data.personality ?? null;
+				worker.terminate();
+				resolve();
+			};
+
+			worker.onerror = () => {
+				worker.terminate();
+				resolve(); // keep existing profile
+			};
+
+			worker.postMessage({
+				scrobbles: strippedScrobbles,
+				enrichment: Object.keys(enrichment).length > 0 ? enrichment : undefined,
+				range: range ?? dateRange,
+				did,
+				handle
+			});
+		});
 	}
 
 	/** Yield to the browser so it can paint before we continue. */
@@ -246,14 +255,14 @@
 		};
 	}
 
-	// React to date range changes — fetch from server
+	// React to date range changes — recompute in worker
 	let profileReady = $state(false);
 
 	$effect(() => {
 		const range = dateRange; // explicit dependency
 		if (profileReady && did && rawScrobbles.length > 0) {
 			recomputing = true;
-			computeServerProfile(range).finally(() => { recomputing = false; });
+			computeWorkerProfile(range).finally(() => { recomputing = false; });
 		}
 	});
 
@@ -335,11 +344,11 @@
 			}
 			rawScrobbles = allScrobbles;
 
-			// 4. Compute profile on server (server runs all analysis)
-			await computeServerProfile();
+			// 4. Compute profile in web worker (off main thread)
+			await computeWorkerProfile();
 			phase = 'complete';
 			profileReady = true;
-			console.log(`[tourmaline] loaded ${loaded} scrobbles, profile computed server-side`);
+			console.log(`[tourmaline] loaded ${loaded} scrobbles, profile computed in worker`);
 
 			// 5. Enrich ALL artists, sorted by play count — 6 concurrent workers
 			if (profile && profile.topArtists.length > 0) {
@@ -350,9 +359,9 @@
 				enrichProgress = { current: 0, total: allArtists.length };
 				console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
 
-				// Re-compute profile on server every 2 seconds during enrichment
+				// Recompute profile in worker every 2 seconds during enrichment
 				enrichProfileTimer = setInterval(() => {
-					computeServerProfile();
+					computeWorkerProfile();
 				}, 2000);
 
 				await runConcurrent(
@@ -368,11 +377,10 @@
 				);
 
 				// Done enriching — compute final profile
-				if (enrichProfileTimer) {
-					clearInterval(enrichProfileTimer);
+				if (enrichProfileTimer) {					clearInterval(enrichProfileTimer);
 					enrichProfileTimer = null;
 				}
-				await computeServerProfile();
+				await computeWorkerProfile();
 			}
 
 			phase = 'complete';
