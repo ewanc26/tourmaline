@@ -16,7 +16,7 @@ export function buildOnThisDay(scrobbles: TealScrobble[]): OnThisDayEntry[] {
 
 	const now = new Date();
 	const currentYear = now.getFullYear();
-	const todayMMDD = now.toISOString().substring(5, 10); // MM-DD
+	const todayMMDD = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 	// Group scrobbles by year for today's date
 	const byYear = new Map<number, { artistCounts: Map<string, number>; total: number }>();

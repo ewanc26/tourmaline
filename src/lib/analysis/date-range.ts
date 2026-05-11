@@ -28,13 +28,17 @@ export function presetRange(preset: DateRangePreset): DateRange {
 	}
 
 	const now = new Date();
-	const end = now.toISOString().substring(0, 10);
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const end = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
 	const days: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '365d': 365 };
 	const start = new Date(now);
 	start.setDate(start.getDate() - days[preset]);
 
-	return { start: start.toISOString().substring(0, 10), end };
+	return {
+		start: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+		end
+	};
 }
 
 /**

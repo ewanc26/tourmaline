@@ -7,8 +7,6 @@
 	import type { PersonalityCardData } from '$lib/share/personality-svg';
 	import { ExternalLink, ArrowLeft } from '@lucide/svelte';
 
-	export const ssr = false;
-
 	const STORAGE_KEY = 'tourmaline:share';
 
 	let agent = $state<Agent | null>(null);
