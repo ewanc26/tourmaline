@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { Chart, registerables } from 'chart.js';
+	import { Chart } from '$lib/chart';
 	import type { GenreEntry } from '$lib/types';
-
-	Chart.register(...registerables);
 
 	let { genres = [] }: { genres: GenreEntry[] } = $props();
 

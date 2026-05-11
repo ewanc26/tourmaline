@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { Chart, registerables } from 'chart.js';
-
-	Chart.register(...registerables);
+	import { Chart } from '$lib/chart';
 
 	let { scrobblesByHour = [] }: { scrobblesByHour: number[] } = $props();
 
