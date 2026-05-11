@@ -431,6 +431,7 @@
 		color: var(--text);
 		font-family: 'JetBrains Mono', monospace;
 		font-size: 0.875rem;
+		text-align: left;
 	}
 
 	.hero-input:focus {
@@ -468,6 +469,7 @@
 		max-height: 280px;
 		overflow-y: auto;
 		z-index: 100;
+		text-align: left;
 	}
 
 	.suggestion {

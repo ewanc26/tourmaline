@@ -27,18 +27,19 @@
 	}
 </script>
 
-<nav class="mb-6 flex gap-1 border-b border-[var(--border)] sm:mb-8 sm:gap-2" aria-label="Profile sections">
+<nav class="mb-6 flex gap-0.5 border-b border-[var(--border)] sm:mb-8 sm:gap-1" aria-label="Profile sections">
 	{#each TABS as tab (tab.id)}
 		<button
-			class="flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 sm:text-base {activeTab === tab.id
+			class="flex items-center gap-1.5 border-b-2 px-2.5 py-2.5 text-xs font-medium transition-colors sm:px-4 sm:text-sm {activeTab === tab.id
 				? 'border-[var(--accent)] text-[var(--text)]'
 				: 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'}"
 			onclick={() => switchTab(tab.id)}
 			role="tab"
 			aria-selected={activeTab === tab.id}
 		>
-			<tab.icon size={14} class="hidden sm:block" />
-			{tab.label}
+			<tab.icon size={13} class="shrink-0 sm:size-[14px]" />
+			<span class="hidden xs:inline sm:inline">{tab.label}</span>
+			<span class="sr-only xs:hidden">{tab.label}</span>
 		</button>
 	{/each}
 </nav>
