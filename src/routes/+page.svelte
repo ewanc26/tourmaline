@@ -140,7 +140,7 @@
 					<strong>Fetch scrobbles</strong>
 					<p>
 						<code>fm.teal.alpha.feed.play</code> records are read from the user's PDS.
-						Repeat visits only fetch new scrobbles since last time.
+						All processing runs server-side.
 					</p>
 				</div>
 			</li>

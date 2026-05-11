@@ -1,17 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { resolveIdentifier, fetchScrobblesBatched, fetchBlueskyProfile } from '$lib/atproto/resolve';
-	import { enrichArtist } from '$lib/enrich/musicbrainz';
-	import { enrichWithLastfm } from '$lib/enrich/lastfm';
-	import { getArtistImage } from '$lib/enrich/deezer';
 	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
-	import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
+	import type { ListenerProfile } from '$lib/types';
 	import type { SessionStats } from '$lib/analysis/sessions';
 	import type { OnThisDayEntry } from '$lib/analysis/on-this-day';
 	import type { StoryRecap as StoryRecapData } from '$lib/analysis/story-recap';
 	import type { PersonalityProfile } from '$lib/analysis/personality';
 	import type { DateRangePreset } from '$lib/analysis/date-range';
-	import { getCached as getIdbCache, setCached as setIdbCache } from '$lib/cache/client';
 	import GenreChart from './GenreChart.svelte';
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
 	import MoodRadar from './MoodRadar.svelte';
@@ -41,23 +36,27 @@
 		};
 	}
 
-	let { data }: { data: { lastfmApiKey: string | null } } = $props();
+	let { data }: { data: { did: string; handle?: string; displayName?: string; avatar?: string; error?: string } } = $props();
 
-	let phase = $state<'idle' | 'resolving' | 'fetching' | 'enriching' | 'complete' | 'error'>('idle');
-	let fromCache = $state(false);
-	let did = $state('');
-	let handle = $state<string | undefined>();
-	let bskyDisplayName = $state<string | undefined>();
-	let bskyAvatar = $state<string | undefined>();
+	// Identity from server load (already resolved)
+	let did = $state(data.did);
+	let handle = $state(data.handle);
+	let bskyDisplayName = $state(data.displayName);
+	let bskyAvatar = $state(data.avatar);
+
+	// Loading phases
+	let phase = $state<'idle' | 'fetching' | 'computing' | 'enriching' | 'complete' | 'error'>('idle');
 	let loaded = $state(0);
 	let enrichProgress = $state({ current: 0, total: 0 });
-	let error = $state('');
+	let error = $state(data.error ?? '');
+
+	// Profile data
+	let profiles = $state<Record<string, ListenerProfile>>({});
 	let profile = $state<ListenerProfile | null>(null);
 	let sessionStats = $state<SessionStats | null>(null);
 	let onThisDayEntries = $state<OnThisDayEntry[]>([]);
 	let storyRecap_ = $state<StoryRecapData | null>(null);
 	let personality = $state<PersonalityProfile | null>(null);
-	let rawScrobbles = $state<TealScrobble[]>([]);
 
 	type Tab = 'overview' | 'taste' | 'habits' | 'catalogue';
 	let activeTab = $state<Tab>('overview');
@@ -69,338 +68,104 @@
 	}
 
 	let dateRange = $state<DateRangePreset>('all');
-	let recomputing = $state(false);
 
-	const artistInfos = new Map<string, ArtistInfo>();
-
-	/** Write scrobbles + cursor to IndexedDB (client-side cache). */
-	async function writeCache(did: string, scrobbles: TealScrobble[], cursor: string): Promise<void> {
-		await setIdbCache(did, { cursor, scrobbles, fetchedAt: Date.now() });
-	}
-
-	/** Compute the profile in a web worker — off the main thread, no body size limits. */
-	let activeWorker: Worker | null = null;
-
-	function computeWorkerProfile(range?: DateRangePreset): Promise<void> {
-		return new Promise((resolve) => {
-			if (!did || rawScrobbles.length === 0) {
-				resolve();
-				return;
-			}
-
-			// Terminate any in-flight worker before starting a new one
-			if (activeWorker) {
-				activeWorker.terminate();
-				activeWorker = null;
-			}
-
-			const worker = new Worker(
-				new URL('$lib/analysis/worker.ts', import.meta.url),
-				{ type: 'module' }
-			);
-			activeWorker = worker;
-
-			// Strip scrobbles to fields the worker needs
-			const strippedScrobbles = rawScrobbles.map((s) => ({
-				playedTime: s.playedTime,
-				trackName: s.trackName,
-				releaseName: s.releaseName ?? undefined,
-				artists: [{ name: s.artists[0]?.name ?? 'Unknown' }],
-				duration: s.duration,
-				musicServiceBaseDomain: s.musicServiceBaseDomain
-			}));
-
-			// Serialise enrichment data gathered so far
-			const enrichment: Record<string, ArtistInfo> = {};
-			for (const [name, info] of artistInfos) {
-				enrichment[name] = info;
-			}
-
-			worker.onmessage = (e) => {
-				if (activeWorker === worker) activeWorker = null;
-				profile = e.data.profile;
-				sessionStats = e.data.sessionStats ?? null;
-				onThisDayEntries = e.data.onThisDay ?? [];
-				storyRecap_ = e.data.storyRecap ?? null;
-				personality = e.data.personality ?? null;
-				worker.terminate();
-				resolve();
-			};
-
-			worker.onerror = (e) => {
-				if (activeWorker === worker) activeWorker = null;
-				console.error('[tourmaline] worker error:', e.message);
-				worker.terminate();
-				resolve(); // keep existing profile
-			};
-
-			worker.postMessage({
-				scrobbles: strippedScrobbles,
-				enrichment: Object.keys(enrichment).length > 0 ? enrichment : undefined,
-				range: range ?? dateRange,
-				did,
-				handle
-			});
-		});
-	}
-
-	/** Yield to the browser so it can paint before we continue. */
-	function yieldFrame(): Promise<void> {
-		return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-	}
-
-	/**
-	 * Run tasks from a queue with N concurrent workers.
-	 * Each worker picks the next item, calls `process(item)`, then
-	 * calls `onDone()` (which can update UI and yield). Workers
-	 * keep pulling until the queue is drained.
-	 */
-	async function runConcurrent<T>(
-		items: T[],
-		concurrency: number,
-		process: (item: T) => Promise<void>,
-		onDone: () => Promise<void>
-	): Promise<void> {
-		let next = 0;
-		async function worker() {
-			while (next < items.length) {
-				const item = items[next++];
-				await process(item);
-				await onDone();
-			}
-		}
-		await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
-	}
-
-	/** Enrich a single artist with MusicBrainz, Last.fm, and Deezer data. */
-	async function enrichOneArtist(name: string, i: number, total: number): Promise<void> {
-		let info: ArtistInfo | undefined;
-
-		// MusicBrainz
-		try {
-			const mbInfo = await enrichArtist(name);
-			if (mbInfo) {
-				info = mbInfo;
-				artistInfos.set(name, info);
-				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz (genres: ${info.genres.length}, tags: ${info.tags.length})`);
-			} else {
-				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz: no match`);
-			}
-		} catch (e) {
-			console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz failed:`, e);
-		}
-
-		// Last.fm
-		try {
-			const lfmData = await enrichWithLastfm(name);
-			if (lfmData) {
-				const existing = artistInfos.get(name);
-				if (existing) {
-					info = { ...existing, ...lfmData };
-					artistInfos.set(name, info);
-				} else {
-					info = {
-						name,
-						genres: [],
-						tags: lfmData.tags ?? [],
-						similar: lfmData.similar ?? [],
-						listenerCount: lfmData.listenerCount,
-						playCount: lfmData.playCount,
-						imageUrl: lfmData.imageUrl
-					};
-					artistInfos.set(name, info);
-				}
-				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Last.fm (listeners: ${lfmData.listenerCount ?? '?'}, image: ${lfmData.imageUrl ? 'yes' : 'no'})`);
-			}
-		} catch (e) {
-			console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → Last.fm failed:`, e);
-		}
-
-		// Deezer image fallback
-		const existing = artistInfos.get(name);
-		if (!existing?.imageUrl) {
-			try {
-				const imageUrl = await getArtistImage(name);
-				if (imageUrl) {
-					if (existing) {
-						info = { ...existing, imageUrl };
-						artistInfos.set(name, info);
-					} else {
-						info = { name, genres: [], tags: [], similar: [], imageUrl };
-						artistInfos.set(name, info);
-					}
-					console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer image: ${imageUrl}`);
-				} else {
-					console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer: no image`);
-				}
-			} catch (e) {
-				console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer failed:`, e);
-			}
-		}
-	}
-
-	function emptyProfile(did: string, handle?: string): ListenerProfile {
-		return {
-			did,
-			handle,
-			totalScrobbles: 0,
-			uniqueArtists: 0,
-			uniqueTracks: 0,
-			totalMinutes: 0,
-			topArtists: [],
-			topTracks: [],
-			topAlbums: [],
-			genres: [],
-			timeline: [],
-			dailyScrobbles: [],
-			era: [],
-			diversityScore: 0,
-			giniCoefficient: 0,
-			obscurityIndex: 50,
-			mood: {},
-			scrobblesByHour: new Array(24).fill(0),
-			serviceOrigins: {},
-			monthlyGenres: [],
-			remarkableDays: [],
-			discoveredArtists: [],
-			phases: []
-		};
-	}
-
-	// React to date range changes — recompute in worker
-	let profileReady = $state(false);
-
+	// Switch profile when date range changes (all profiles pre-computed server-side)
 	$effect(() => {
-		const range = dateRange; // explicit dependency
-		if (profileReady && did && rawScrobbles.length > 0) {
-			recomputing = true;
-			computeWorkerProfile(range).finally(() => { recomputing = false; });
+		if (profiles[dateRange]) {
+			profile = profiles[dateRange];
 		}
 	});
 
-	// Re-fetch profile periodically during enrichment
-	let enrichProfileTimer: ReturnType<typeof setInterval> | null = null;
-
 	onMount(async () => {
-		const identifier = decodeURIComponent(window.location.pathname.split('/').pop() ?? '');
-
-		// Expose Last.fm API key to client-side enrichment
-		if (data.lastfmApiKey) {
-			(window as unknown as Record<string, string>).__LASTFM_API_KEY = data.lastfmApiKey;
-		}
+		if (error || !did) return;
 
 		const t0 = performance.now();
-		let pdsUrl = '';
-		let cursor: string | undefined;
 
 		try {
-			// 1. Resolve identity
-			phase = 'resolving';
-			console.log(`[tourmaline] resolving identity: ${identifier}`);
-			const identity = await resolveIdentifier(identifier);
-			did = identity.did;
-			handle = identity.handle;
-			pdsUrl = identity.pdsUrl;
-			profile = emptyProfile(did, handle);
-			console.log(`[tourmaline] resolved → did: ${did}, handle: ${handle ?? '(none)'}, pds: ${pdsUrl}`);
-
-			// Fetch Bluesky profile for display name and avatar
-			const bskyProfile = await fetchBlueskyProfile(pdsUrl, did);
-			bskyDisplayName = bskyProfile.displayName;
-			bskyAvatar = bskyProfile.avatar;
-			console.log(`[tourmaline] bsky profile → displayName: ${bskyDisplayName ?? '(none)'}, avatar: ${bskyAvatar ? 'yes' : 'no'}`);
-
-			// 2. Check client-side cache
-			const cached = await getIdbCache(did);
-			if (cached && cached.scrobbles.length > 0) {
-				fromCache = true;
-				loaded = cached.scrobbles.length;
-				cursor = cached.cursor;
-				rawScrobbles = cached.scrobbles;
-			}
-
-			// 3. Fetch scrobbles from PDS (incremental if cache hit)
+			// 1. Fetch scrobbles in batches
 			phase = 'fetching';
-			const fetchStart = performance.now();
-			const newScrobbles = await fetchScrobblesBatched(
-				pdsUrl,
-				did,
-				async (batch, totalSoFar) => {
-					loaded = totalSoFar;
-					await yieldFrame();
-				},
-				undefined,
-				cursor
-			);
-			console.log(`[tourmaline] fetched ${newScrobbles.length} new scrobbles in ${((performance.now() - fetchStart) / 1000).toFixed(1)}s`);
+			let batch = 0;
+			let fetchDone = false;
 
-			// Update the cursor to the most recent scrobble
-			if (newScrobbles.length > 0) {
-				cursor = newScrobbles[0].playedTime;
-			}
+			while (!fetchDone) {
+				const res = await fetch(`/api/scrobbles/${encodeURIComponent(did)}?continue=${batch > 0}`);
+				const data = await res.json();
 
-			// Write back to both caches (deduplicate — scrobbles at the
-			// cursor timestamp may appear in both old and new sets)
-			const allScrobbles = cached
-				? (() => {
-						const newKeys = new Set(
-							newScrobbles.map((s) => `${s.playedTime}|||${s.trackName}`)
-						);
-						return [...newScrobbles, ...cached.scrobbles.filter(
-							(s) => !newKeys.has(`${s.playedTime}|||${s.trackName}`)
-						)];
-					})()
-				: [...newScrobbles];
-			if (allScrobbles.length > 0 && cursor) {
-				await writeCache(did, allScrobbles, cursor);
-			}
-			rawScrobbles = allScrobbles;
-
-			// 4. Compute profile in web worker (off main thread)
-			await computeWorkerProfile();
-			phase = 'complete';
-			profileReady = true;
-			console.log(`[tourmaline] loaded ${loaded} scrobbles, profile computed in worker`);
-
-			// 5. Enrich ALL artists, sorted by play count — 6 concurrent workers
-			if (profile && profile.topArtists.length > 0) {
-				phase = 'enriching';
-				const allArtists = [...profile.topArtists]
-					.sort((a, b) => b.count - a.count)
-					.map((a) => a.name);
-				enrichProgress = { current: 0, total: allArtists.length };
-				console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
-
-				// Recompute profile in worker every 2 seconds during enrichment
-				enrichProfileTimer = setInterval(() => {
-					computeWorkerProfile();
-				}, 2000);
-
-				await runConcurrent(
-					allArtists,
-					6,
-					async (name) => {
-						await enrichOneArtist(name, enrichProgress.current, allArtists.length);
-					},
-					async () => {
-						enrichProgress.current++;
-						await yieldFrame();
-					}
-				);
-
-				// Done enriching — compute final profile
-				if (enrichProfileTimer) {					clearInterval(enrichProfileTimer);
-					enrichProfileTimer = null;
+				if (data.coldStart) {
+					// Server restarted — start fresh
+					batch = 0;
+					continue;
 				}
-				await computeWorkerProfile();
+
+				if (data.error) {
+					throw new Error(data.error);
+				}
+
+				loaded = data.loaded;
+				fetchDone = data.done;
+				batch++;
+			}
+
+			// 2. Compute profile (all date ranges at once)
+			phase = 'computing';
+			const profileRes = await fetch(`/api/profile/${encodeURIComponent(did)}`);
+			const profileData = await profileRes.json();
+
+			if (profileData.error) {
+				throw new Error(profileData.error);
+			}
+
+			profiles = profileData.profiles;
+			profile = profiles[dateRange];
+			sessionStats = profileData.sessionStats;
+			onThisDayEntries = profileData.onThisDay ?? [];
+			storyRecap_ = profileData.storyRecap ?? null;
+			personality = profileData.personality ?? null;
+
+			// 3. Enrich artists in batches
+			if (profile && !profileData.enrichmentDone) {
+				phase = 'enriching';
+				let enrichBatch = 0;
+				let enrichDone = false;
+
+				while (!enrichDone) {
+					const res = await fetch(`/api/enrich/${encodeURIComponent(did)}?continue=${enrichBatch > 0}`);
+					const data = await res.json();
+
+					if (data.coldStart) {
+						enrichBatch = 0;
+						continue;
+					}
+
+					if (data.error) {
+						console.warn('[tourmaline] enrichment error:', data.error);
+						break;
+					}
+
+					enrichProgress = { current: data.current, total: data.total };
+					enrichDone = data.done;
+					enrichBatch++;
+				}
+
+				// Re-fetch profile with enrichment applied
+				const enrichedRes = await fetch(`/api/profile/${encodeURIComponent(did)}`);
+				const enrichedData = await enrichedRes.json();
+				if (!enrichedData.error) {
+					profiles = enrichedData.profiles;
+					profile = profiles[dateRange];
+					sessionStats = enrichedData.sessionStats;
+					onThisDayEntries = enrichedData.onThisDay ?? [];
+					storyRecap_ = enrichedData.storyRecap ?? null;
+					personality = enrichedData.personality ?? null;
+				}
 			}
 
 			phase = 'complete';
-			console.log(`[tourmaline] complete in ${((performance.now() - t0) / 1000).toFixed(1)}s — ${loaded} scrobbles, ${artistInfos.size} artists enriched`);
+			console.log(`[tourmaline] complete in ${((performance.now() - t0) / 1000).toFixed(1)}s — ${loaded} scrobbles`);
 		} catch (e) {
 			phase = 'error';
 			error = e instanceof Error ? e.message : String(e);
-			console.error(`[tourmaline] error:`, e);
+			console.error('[tourmaline] error:', e);
 		}
 	});
 </script>
@@ -433,24 +198,20 @@
 	<!-- Loading state -->
 	{#if phase !== 'complete' && phase !== 'error'}
 		<div class="mb-8 rounded border border-[var(--border)] bg-[var(--surface)] p-6">
-			{#if phase === 'resolving'}
+			{#if phase === 'fetching'}
 				<div class="flex items-center gap-3">
 					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-					<span class="text-sm text-[var(--text)]">Resolving identity...</span>
+					<span class="text-sm text-[var(--text)]">Fetching scrobbles...</span>
 				</div>
-			{:else if phase === 'fetching'}
+				<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
+					<div class="h-full w-1/3 animate-indeterminate rounded-full bg-green-600"></div>
+				</div>
+				<p class="mt-2 text-xs text-[var(--text-dim)]">{loaded.toLocaleString()} scrobbles loaded</p>
+			{:else if phase === 'computing'}
 				<div class="flex items-center gap-3">
 					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-					<span class="text-sm text-[var(--text)]">
-						{fromCache ? 'Checking for new scrobbles...' : 'Fetching scrobbles...'}
-					</span>
+					<span class="text-sm text-[var(--text)]">Computing profile...</span>
 				</div>
-				{#if !fromCache}
-					<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-						<div class="h-full w-1/3 animate-indeterminate rounded-full bg-green-600"></div>
-					</div>
-					<p class="mt-2 text-xs text-[var(--text-dim)]">{loaded.toLocaleString()} scrobbles loaded</p>
-				{/if}
 			{:else if phase === 'enriching'}
 				<div class="flex items-center gap-3">
 					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
@@ -495,9 +256,6 @@
 		<!-- Date range picker -->
 		<div class="mb-4 flex items-center gap-3 sm:mb-6">
 			<DateRangePicker bind:value={dateRange} />
-			{#if recomputing}
-				<span class="text-xs text-[var(--text-dim)] animate-pulse">Recalculating…</span>
-			{/if}
 		</div>
 
 		<!-- Tab navigation -->

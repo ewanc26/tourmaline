@@ -1,9 +1,10 @@
+import { json } from '@sveltejs/kit';
 import { resolveIdentifier, fetchBlueskyProfile } from '$lib/server/resolve';
 import { createSession } from '$lib/server/session';
-import type { PageServerLoad } from './$types';
+import type { RequestHandler } from './$types';
 
-export const load: PageServerLoad = async ({ params }) => {
-	const identifier = decodeURIComponent(params.did);
+export const GET: RequestHandler = async ({ params }) => {
+	const identifier = decodeURIComponent(params.identifier);
 
 	try {
 		const identity = await resolveIdentifier(identifier);
@@ -12,19 +13,14 @@ export const load: PageServerLoad = async ({ params }) => {
 		// Create a session for subsequent API calls
 		createSession(identity.did, identity.pdsUrl, identity.handle);
 
-		return {
+		return json({
 			did: identity.did,
 			handle: identity.handle,
 			displayName: bskyProfile.displayName,
 			avatar: bskyProfile.avatar
-		};
+		});
 	} catch (e) {
-		return {
-			did: '',
-			handle: undefined,
-			displayName: undefined,
-			avatar: undefined,
-			error: e instanceof Error ? e.message : 'Failed to resolve identifier'
-		};
+		const message = e instanceof Error ? e.message : 'Failed to resolve identifier';
+		return json({ error: message }, { status: 400 });
 	}
 };
