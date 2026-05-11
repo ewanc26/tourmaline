@@ -143,18 +143,18 @@
 
 	let { data }: { data: { did: string; handle?: string; pdsUrl?: string; displayName?: string; avatar?: string; error?: string } } = $props();
 
-	// Identity from server load (already resolved)
-	let did = $state(data.did);
-	let handle = $state(data.handle);
-	let pdsUrl = $state(data.pdsUrl);
-	let bskyDisplayName = $state(data.displayName);
-	let bskyAvatar = $state(data.avatar);
+	// Identity from server load (already resolved — immutable)
+	let did = $derived(data.did);
+	let handle = $derived(data.handle);
+	let pdsUrl = $derived(data.pdsUrl);
+	let bskyDisplayName = $derived(data.displayName);
+	let bskyAvatar = $derived(data.avatar);
 
 	// Loading phases
 	let phase = $state<'idle' | 'fetching' | 'computing' | 'enriching' | 'complete' | 'error'>('idle');
 	let loaded = $state(0);
 	let enrichProgress = $state({ current: 0, total: 0 });
-	let error = $state(data.error ?? '');
+	let error = $state('');
 
 	// Timing
 	let fetchStartTime = $state(0);
@@ -189,7 +189,8 @@
 	});
 
 	onMount(async () => {
-		if (error || !did || !pdsUrl) return;
+		if (data.error) { error = data.error; return; }
+		if (!did || !pdsUrl) return;
 
 		const t0 = performance.now();
 

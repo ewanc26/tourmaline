@@ -162,7 +162,10 @@
 							<li
 								class="suggestion {selectedIndex === i ? 'selected' : ''}"
 								role="option"
+								aria-selected={selectedIndex === i}
 								onclick={() => selectSuggestion(actor)}
+								onkeydown={(e) => { if (e.key === 'Enter') selectSuggestion(actor); }}
+								tabindex={-1}
 							>
 								{#if actor.avatar}
 									<img src={actor.avatar} alt="" class="avatar" />
