@@ -73,33 +73,45 @@
 
 	const artistInfos = new Map<string, ArtistInfo>();
 
-	/** Write scrobbles + cursor to both IndexedDB and server cache. */
+	/** Write scrobbles + cursor to IndexedDB (client-side cache). */
 	async function writeCache(did: string, scrobbles: TealScrobble[], cursor: string): Promise<void> {
-		// IndexedDB (client-side)
 		await setIdbCache(did, { cursor, scrobbles, fetchedAt: Date.now() });
-
-		// Server SQLite
-		try {
-			await fetch('/api/scrobbles/cache', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ did, scrobbles, cursor })
-			});
-		} catch {
-			// server cache write is non-critical
-		}
 	}
 
-	/** Fetch the computed profile from the server endpoint. */
-	async function fetchServerProfile(range?: DateRangePreset): Promise<void> {
-		if (!did) return;
+	/** Compute the profile on the server by POSTing scrobbles + enrichment. */
+	async function computeServerProfile(range?: DateRangePreset): Promise<void> {
+		if (!did || rawScrobbles.length === 0) return;
 		const rangeParam = range ?? dateRange;
 		const url = `/api/profile/${encodeURIComponent(did)}?range=${rangeParam}`;
+
+		// Strip scrobbles down to fields the server needs — reduces payload ~60%
+		const strippedScrobbles = rawScrobbles.map((s) => ({
+			playedTime: s.playedTime,
+			trackName: s.trackName,
+			releaseName: s.releaseName ?? undefined,
+			artists: [{ name: s.artists[0]?.name ?? 'Unknown' }],
+			duration: s.duration,
+			service: s.service
+		}));
+
+		// Serialise enrichment data the client has gathered so far
+		const enrichment: Record<string, ArtistInfo> = {};
+		for (const [name, info] of artistInfos) {
+			enrichment[name] = info;
+		}
+
 		try {
-			const res = await fetch(url);
+			const res = await fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					scrobbles: strippedScrobbles,
+					enrichment: Object.keys(enrichment).length > 0 ? enrichment : undefined
+				})
+			});
 			if (!res.ok) return;
 			const body = await res.json();
-			if (body.cached && body.profile) {
+			if (body.profile) {
 				profile = body.profile;
 				sessionStats = body.sessionStats ?? null;
 				onThisDayEntries = body.onThisDay ?? [];
@@ -107,40 +119,7 @@
 				personality = body.personality ?? null;
 			}
 		} catch {
-			// server profile fetch failure — keep existing profile
-		}
-	}
-
-	/** Push enrichment data to the server in batches. */
-	let enrichmentBatch: Array<{ name: string; data: ArtistInfo }> = [];
-	let enrichmentBatchTimer: ReturnType<typeof setTimeout> | null = null;
-
-	function pushEnrichment(name: string, info: ArtistInfo): void {
-		enrichmentBatch.push({ name, data: info });
-		if (!enrichmentBatchTimer) {
-			enrichmentBatchTimer = setTimeout(flushEnrichment, 500);
-		}
-		if (enrichmentBatch.length >= 5) {
-			flushEnrichment();
-		}
-	}
-
-	async function flushEnrichment(): Promise<void> {
-		if (enrichmentBatch.length === 0) return;
-		const batch = enrichmentBatch;
-		enrichmentBatch = [];
-		if (enrichmentBatchTimer) {
-			clearTimeout(enrichmentBatchTimer);
-			enrichmentBatchTimer = null;
-		}
-		try {
-			await fetch('/api/enrichment', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ artists: batch })
-			});
-		} catch {
-			// enrichment push is non-critical
+			// server profile compute failure — keep existing profile
 		}
 	}
 
@@ -237,11 +216,6 @@
 				console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer failed:`, e);
 			}
 		}
-
-		// Push enrichment data to server
-		if (info) {
-			pushEnrichment(name, info);
-		}
 	}
 
 	function emptyProfile(did: string, handle?: string): ListenerProfile {
@@ -277,9 +251,9 @@
 
 	$effect(() => {
 		const range = dateRange; // explicit dependency
-		if (profileReady && did && profile && profile.totalScrobbles > 0) {
+		if (profileReady && did && rawScrobbles.length > 0) {
 			recomputing = true;
-			fetchServerProfile(range).finally(() => { recomputing = false; });
+			computeServerProfile(range).finally(() => { recomputing = false; });
 		}
 	});
 
@@ -361,11 +335,11 @@
 			}
 			rawScrobbles = allScrobbles;
 
-			// 4. Fetch profile from server (server runs all analysis)
-			await fetchServerProfile();
+			// 4. Compute profile on server (server runs all analysis)
+			await computeServerProfile();
 			phase = 'complete';
 			profileReady = true;
-			console.log(`[tourmaline] loaded ${loaded} scrobbles, profile fetched from server`);
+			console.log(`[tourmaline] loaded ${loaded} scrobbles, profile computed server-side`);
 
 			// 5. Enrich ALL artists, sorted by play count — 6 concurrent workers
 			if (profile && profile.topArtists.length > 0) {
@@ -376,9 +350,9 @@
 				enrichProgress = { current: 0, total: allArtists.length };
 				console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
 
-				// Re-fetch profile from server every 2 seconds during enrichment
+				// Re-compute profile on server every 2 seconds during enrichment
 				enrichProfileTimer = setInterval(() => {
-					fetchServerProfile();
+					computeServerProfile();
 				}, 2000);
 
 				await runConcurrent(
@@ -393,13 +367,12 @@
 					}
 				);
 
-				// Flush remaining enrichment data and fetch final profile
-				await flushEnrichment();
+				// Done enriching — compute final profile
 				if (enrichProfileTimer) {
 					clearInterval(enrichProfileTimer);
 					enrichProfileTimer = null;
 				}
-				await fetchServerProfile();
+				await computeServerProfile();
 			}
 
 			phase = 'complete';
