@@ -28,6 +28,24 @@ const ALBUM_KEY = (s: TealScrobble) =>
 	s.releaseName ? `${s.releaseName}|||${s.artists.map((a) => a.name).join(',')}` : null;
 
 /**
+ * Normalise a scrobble's duration field to seconds.
+ *
+ * The fm.teal.alpha.feed.play lexicon defines `duration` as seconds,
+ * but some scrobbling clients store milliseconds instead. A value
+ * above 10 000 (≈ 2.7 hours) is almost certainly in milliseconds —
+ * even the longest classical pieces rarely exceed 3 600 seconds.
+ *
+ * Returns 210 (3.5 minutes) as a fallback when absent.
+ */
+function normaliseDuration(raw: number | undefined): number {
+	if (raw === undefined || raw === null) return 210;
+	// Detect milliseconds: > 10 000 seconds is unreasonable for a single track
+	if (raw > 10000) return Math.round(raw / 1000);
+	// Cap at 1 hour — anything higher is noise
+	return Math.min(raw, 3600);
+}
+
+/**
  * Incremental aggregator. Maintains running totals so it can be updated
  * as each batch of scrobbles arrives without reprocessing everything.
  */
@@ -79,8 +97,8 @@ export class Aggregator {
 				}
 			}
 
-			// Duration (seconds → minutes; default 3.5 min if absent)
-			this.minutesCount += (scrobble.duration ?? 210) / 60;
+			// Duration (normalised to seconds → minutes; default 3.5 min if absent)
+			this.minutesCount += normaliseDuration(scrobble.duration) / 60;
 
 			const date = new Date(scrobble.playedTime);
 			if (isNaN(date.getTime())) continue;
