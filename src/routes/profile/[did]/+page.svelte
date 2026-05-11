@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
+	import { Loader2, Cpu, Sparkles, Music2, Users, LayoutGrid, Gem } from '@lucide/svelte';
 	import type { ListenerProfile, TealScrobble, ArtistInfo } from '$lib/types';
 	import type { SessionStats } from '$lib/analysis/sessions';
 	import type { OnThisDayEntry } from '$lib/analysis/on-this-day';
@@ -334,72 +335,109 @@
 		</div>
 	</header>
 
-	<!-- Loading state -->
+	<!-- ── Loading state ──────────────────────────────────────────────────── -->
 	{#if phase !== 'complete' && phase !== 'error'}
-		<div class="mb-8 rounded border border-[var(--border)] bg-[var(--surface)] p-6">
+		<div class="mb-8 overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)]">
 			{#if phase === 'fetching'}
-				<div class="flex items-center gap-3">
-					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-					<span class="text-sm text-[var(--text)]">Fetching scrobbles...</span>
+				<div class="p-5">
+					<div class="flex items-center gap-3">
+						<Loader2 size={16} class="shrink-0 animate-spin text-[var(--accent)]" />
+						<div class="min-w-0">
+							<p class="text-sm font-medium text-[var(--text)]">Fetching scrobbles</p>
+							<p class="mt-0.5 text-xs text-[var(--text-dim)]">
+								{loaded.toLocaleString()} loaded
+								{#if elapsed > 0}
+									· {formatTime(elapsed)} elapsed
+									· {loaded > 0 ? (loaded / elapsed).toFixed(0) : '—'}/sec
+								{/if}
+							</p>
+						</div>
+					</div>
+					<div class="mt-3.5 h-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+						<div class="h-full w-1/3 animate-indeterminate rounded-full bg-[var(--accent-dim)]"></div>
+					</div>
 				</div>
-				<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-					<div class="h-full w-1/3 animate-indeterminate rounded-full bg-green-600"></div>
-				</div>
-				<p class="mt-2 text-xs text-[var(--text-dim)]">
-					{loaded.toLocaleString()} scrobbles loaded
-					{#if elapsed > 0}
-						· {formatTime(elapsed)} elapsed
-						· {loaded > 0 ? (loaded / elapsed).toFixed(0) : '—'} scrobbles/sec
-					{/if}
-				</p>
 			{:else if phase === 'computing'}
-				<div class="flex items-center gap-3">
-					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-					<span class="text-sm text-[var(--text)]">Computing profile...</span>
+				<div class="p-5">
+					<div class="flex items-center gap-3">
+						<Cpu size={16} class="shrink-0 animate-pulse text-[var(--accent)]" />
+						<div>
+							<p class="text-sm font-medium text-[var(--text)]">Computing profile</p>
+							<p class="mt-0.5 text-xs text-[var(--text-dim)]">Aggregating {loaded.toLocaleString()} scrobbles…</p>
+						</div>
+					</div>
+					<div class="mt-3.5 h-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+						<div class="h-full w-2/3 animate-indeterminate rounded-full bg-[var(--accent-dim)]"></div>
+					</div>
 				</div>
 			{:else if phase === 'enriching'}
-				<div class="flex items-center gap-3">
-					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-					<span class="text-sm text-[var(--text)]">Enriching artist data... ({enrichProgress.current}/{enrichProgress.total})</span>
+				<div class="p-5">
+					<div class="flex items-center gap-3">
+						<Sparkles size={16} class="shrink-0 animate-pulse text-[var(--accent)]" />
+						<div class="min-w-0 flex-1">
+							<p class="text-sm font-medium text-[var(--text)]">Enriching artist data</p>
+							<p class="mt-0.5 text-xs text-[var(--text-dim)]">
+								{enrichProgress.current} / {enrichProgress.total} artists
+								{#if enrichElapsed > 0}
+									· {formatTime(enrichElapsed)} elapsed
+									{#if enrichProgress.current > 0}
+										· {estimateRemaining(enrichProgress.current, enrichProgress.total, enrichElapsed)} remaining
+									{/if}
+								{/if}
+							</p>
+						</div>
+						<span class="shrink-0 font-mono text-xs text-[var(--text-dim)]">
+							{enrichProgress.total > 0 ? Math.round((enrichProgress.current / enrichProgress.total) * 100) : 0}%
+						</span>
+					</div>
+					<div class="mt-3.5 h-1 overflow-hidden rounded-full bg-[var(--surface-2)]">
+						<div
+							class="h-full rounded-full bg-[var(--accent-dim)] transition-all duration-300"
+							style="width: {enrichProgress.total > 0 ? (enrichProgress.current / enrichProgress.total) * 100 : 0}%"
+						></div>
+					</div>
 				</div>
-				<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-					<div class="h-full rounded-full bg-green-600 transition-all duration-300" style="width: {enrichProgress.total > 0 ? (enrichProgress.current / enrichProgress.total * 100) : 0}%"></div>
-				</div>
-				<p class="mt-2 text-xs text-[var(--text-dim)]">
-					{#if enrichElapsed > 0}
-						{formatTime(enrichElapsed)} elapsed
-						· {enrichProgress.current > 0 ? estimateRemaining(enrichProgress.current, enrichProgress.total, enrichElapsed) + ' remaining' : '—'}
-					{/if}
-				</p>
 			{/if}
 		</div>
 	{/if}
 
-	<!-- Error state -->
+	<!-- ── Error state ────────────────────────────────────────────────────── -->
 	{#if phase === 'error'}
-		<div class="mb-8 rounded border border-red-800 bg-red-900/30 p-6">
-			<p class="text-red-400">{error}</p>
+		<div class="mb-8 rounded border border-[var(--error)]/40 bg-[var(--error)]/10 p-5">
+			<p class="text-sm font-medium text-[var(--error)]">{error}</p>
 		</div>
 	{/if}
 
-	<!-- Profile content -->
+	<!-- ── Profile content ────────────────────────────────────────────────── -->
 	{#if profile && profile.totalScrobbles > 0}
 		<!-- Stats row (always visible) -->
-		<div class="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 sm:grid-cols-4">
-			<div class="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
-				<p class="text-xs text-[var(--text-muted)]">Scrobbles</p>
+		<div class="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:grid-cols-4 sm:gap-4">
+			<div class="flex flex-col gap-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
+				<div class="flex items-center gap-1.5">
+					<Music2 size={11} class="text-[var(--text-dim)]" />
+					<p class="text-xs text-[var(--text-muted)]">Scrobbles</p>
+				</div>
 				<p class="text-xl font-bold sm:text-2xl">{profile.totalScrobbles.toLocaleString()}</p>
 			</div>
-			<div class="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
-				<p class="text-xs text-[var(--text-muted)]">Unique Artists</p>
+			<div class="flex flex-col gap-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
+				<div class="flex items-center gap-1.5">
+					<Users size={11} class="text-[var(--text-dim)]" />
+					<p class="text-xs text-[var(--text-muted)]">Unique Artists</p>
+				</div>
 				<p class="text-xl font-bold sm:text-2xl">{profile.uniqueArtists.toLocaleString()}</p>
 			</div>
-			<div class="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
-				<p class="text-xs text-[var(--text-muted)]">Diversity</p>
+			<div class="flex flex-col gap-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
+				<div class="flex items-center gap-1.5">
+					<LayoutGrid size={11} class="text-[var(--text-dim)]" />
+					<p class="text-xs text-[var(--text-muted)]">Diversity</p>
+				</div>
 				<p class="text-xl font-bold sm:text-2xl">{profile.diversityScore}<span class="text-sm text-[var(--text-muted)]">/100</span></p>
 			</div>
-			<div class="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
-				<p class="text-xs text-[var(--text-muted)]">Obscurity</p>
+			<div class="flex flex-col gap-1 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:p-4">
+				<div class="flex items-center gap-1.5">
+					<Gem size={11} class="text-[var(--text-dim)]" />
+					<p class="text-xs text-[var(--text-muted)]">Obscurity</p>
+				</div>
 				<p class="text-xl font-bold sm:text-2xl">{profile.obscurityIndex}<span class="text-sm text-[var(--text-muted)]">/100</span></p>
 			</div>
 		</div>
@@ -414,7 +452,6 @@
 
 		<!-- ── Overview tab ─────────────────────────────── -->
 		{#if activeTab === 'overview'}
-			<!-- Story recap -->
 			{#if storyRecap_}
 				<div class="mb-6 sm:mb-8">
 					<StoryRecap recap={storyRecap_} />
@@ -537,7 +574,7 @@
 			</div>
 
 			<!-- Top tracks + albums side by side -->
-			<div class="grid gap-4 sm:gap-8 lg:grid-cols-2">
+			<div class="mb-6 grid gap-4 sm:mb-8 sm:gap-8 lg:grid-cols-2">
 				<div class="overflow-hidden rounded border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-4">
 					<h2 class="mb-3 text-base font-semibold sm:mb-4 sm:text-lg">Top Tracks</h2>
 					<ol class="space-y-2">

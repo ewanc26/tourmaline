@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, X, ExternalLink, Heart } from '@lucide/svelte';
+	import { Check, X, ExternalLink, Heart, ArrowLeft } from '@lucide/svelte';
 </script>
 
 <svelte:head>
@@ -8,6 +8,15 @@
 </svelte:head>
 
 <div class="mx-auto max-w-2xl px-3 py-8 sm:px-4">
+
+	<!-- Back link -->
+	<a
+		href="/"
+		class="mb-6 inline-flex items-center gap-1.5 text-xs text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors"
+	>
+		<ArrowLeft size={12} />
+		Back to home
+	</a>
 
 	<h1 class="text-2xl font-bold tracking-tight text-[var(--text)]">About Tourmaline</h1>
 
@@ -224,6 +233,7 @@
 
 <style>
 	section {
+		margin-top: 2.5rem;
 		margin-bottom: 2.5rem;
 		padding-bottom: 2.5rem;
 		border-bottom: 1px solid var(--border);
@@ -234,6 +244,7 @@
 	}
 
 	h1 {
+		margin-top: 1rem;
 		margin-bottom: 2.5rem;
 	}
 
