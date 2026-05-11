@@ -1,6 +1,6 @@
 import type { ArtistInfo } from '$lib/types';
 
-const MB_USER_AGENT = 'Tourmaline/0.4.1 (https://github.com/ewanc26/tourmaline)';
+const MB_USER_AGENT = 'Tourmaline/0.5.0 (https://github.com/ewanc26/tourmaline)';
 const MB_BASE = 'https://musicbrainz.org/ws/2';
 const LFM_BASE = 'https://ws.audioscrobbler.com/2.0/';
 const DZ_BASE = 'https://api.deezer.com';
