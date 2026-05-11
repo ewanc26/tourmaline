@@ -1,5 +1,7 @@
 # Tourmaline
 
+> **This repository is archived.** Tourmaline has moved to the [pkgs monorepo](https://github.com/ewanc26/pkgs/tree/main/packages/tourmaline).
+
 AT Protocol scrobble analyser. Ingests Teal.fm scrobbles from any handle or DID, cross-references with free music APIs, and builds a listener profile.
 
 ---
