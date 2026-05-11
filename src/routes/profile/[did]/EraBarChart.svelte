@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { Chart, registerables } from 'chart.js';
+	import { Chart } from '$lib/chart';
 	import type { EraEntry } from '$lib/types';
-
-	Chart.register(...registerables);
 
 	let { era = [] }: { era: EraEntry[] } = $props();
 

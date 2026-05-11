@@ -101,6 +101,49 @@
 	}
 
 	/**
+	 * Batched profile updater.
+	 *
+	 * Instead of calling updateProfile after every single artist
+	 * (which triggers full re-analysis and chart re-renders),
+	 * this batches updates: at most once every `batchSize` items
+	 * or every `intervalMs` milliseconds, whichever fires first.
+	 *
+	 * Call `flush()` after the loop to push the final update.
+	 */
+	function createBatchedUpdater(
+		aggregator: Aggregator,
+		batchSize = 5,
+		intervalMs = 300
+	) {
+		let pending = 0;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		let lastUpdate = 0;
+
+		function flush() {
+			pending = 0;
+			if (timer) {
+				clearTimeout(timer);
+				timer = null;
+			}
+			lastUpdate = performance.now();
+			updateProfile(aggregator.snapshot());
+		}
+
+		function tick() {
+			pending++;
+			const now = performance.now();
+
+			if (pending >= batchSize || now - lastUpdate >= intervalMs) {
+				flush();
+			} else if (!timer) {
+				timer = setTimeout(flush, intervalMs - (now - lastUpdate));
+			}
+		}
+
+		return { tick, flush };
+	}
+
+	/**
 	 * Run tasks from a queue with N concurrent workers.
 	 * Each worker picks the next item, calls `process(item)`, then
 	 * calls `onDone()` (which can update UI and yield). Workers
@@ -356,9 +399,14 @@
 			// Write back to both caches (deduplicate — scrobbles at the
 			// cursor timestamp may appear in both old and new sets)
 			const allScrobbles = cached
-				? [...newScrobbles, ...cached.scrobbles.filter(
-						(s) => !newScrobbles.some((n) => n.playedTime === s.playedTime && n.trackName === s.trackName)
-					)]
+				? (() => {
+						const newKeys = new Set(
+							newScrobbles.map((s) => `${s.playedTime}|||${s.trackName}`)
+						);
+						return [...newScrobbles, ...cached.scrobbles.filter(
+							(s) => !newKeys.has(`${s.playedTime}|||${s.trackName}`)
+						)];
+					})()
 				: [...newScrobbles];
 			if (allScrobbles.length > 0 && cursor) {
 				await writeCache(did, allScrobbles, cursor);
@@ -374,6 +422,8 @@
 			enrichProgress = { current: 0, total: allArtists.length };
 			console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
 
+			const batchedUpdater = createBatchedUpdater(aggregator);
+
 			await runConcurrent(
 				allArtists,
 				6,
@@ -382,11 +432,13 @@
 				},
 				async () => {
 					enrichProgress.current++;
-					updateProfile(aggregator.snapshot());
+					batchedUpdater.tick();
 					await yieldFrame();
 				}
 			);
 
+			// Flush any remaining pending updates
+			batchedUpdater.flush();
 			phase = 'complete';
 			console.log(`[tourmaline] complete in ${((performance.now() - t0) / 1000).toFixed(1)}s — ${loaded} scrobbles, ${artistInfos.size} artists enriched`);
 		} catch (e) {

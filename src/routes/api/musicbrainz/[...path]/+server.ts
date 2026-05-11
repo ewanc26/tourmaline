@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
 const BASE_URL = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'Tourmaline/0.4.0 (https://github.com/ewanc26/tourmaline)';
+const USER_AGENT = 'Tourmaline/0.4.1 (https://github.com/ewanc26/tourmaline)';
 
 // MusicBrainz rate limit: 1 request per second per IP
 let lastRequestTime = 0;
