@@ -64,7 +64,7 @@
 	});
 </script>
 
-<svelte:window onkeydown={handleKey} />
+<svelte:window onkeydown={revealed ? handleKey : undefined} />
 
 <div
 	bind:this={containerEl}

@@ -79,6 +79,8 @@
 	}
 
 	/** Compute the profile in a web worker — off the main thread, no body size limits. */
+	let activeWorker: Worker | null = null;
+
 	function computeWorkerProfile(range?: DateRangePreset): Promise<void> {
 		return new Promise((resolve) => {
 			if (!did || rawScrobbles.length === 0) {
@@ -86,10 +88,17 @@
 				return;
 			}
 
+			// Terminate any in-flight worker before starting a new one
+			if (activeWorker) {
+				activeWorker.terminate();
+				activeWorker = null;
+			}
+
 			const worker = new Worker(
 				new URL('$lib/analysis/worker.ts', import.meta.url),
 				{ type: 'module' }
 			);
+			activeWorker = worker;
 
 			// Strip scrobbles to fields the worker needs
 			const strippedScrobbles = rawScrobbles.map((s) => ({
@@ -108,6 +117,7 @@
 			}
 
 			worker.onmessage = (e) => {
+				if (activeWorker === worker) activeWorker = null;
 				profile = e.data.profile;
 				sessionStats = e.data.sessionStats ?? null;
 				onThisDayEntries = e.data.onThisDay ?? [];
@@ -117,7 +127,9 @@
 				resolve();
 			};
 
-			worker.onerror = () => {
+			worker.onerror = (e) => {
+				if (activeWorker === worker) activeWorker = null;
+				console.error('[tourmaline] worker error:', e.message);
 				worker.terminate();
 				resolve(); // keep existing profile
 			};
@@ -435,7 +447,7 @@
 				</div>
 				{#if !fromCache}
 					<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
-						<div class="h-full rounded-full bg-green-600 transition-all duration-300" style="width: {loaded > 0 ? '100' : '0'}%"></div>
+						<div class="h-full w-1/3 animate-indeterminate rounded-full bg-green-600"></div>
 					</div>
 					<p class="mt-2 text-xs text-[var(--text-dim)]">{loaded.toLocaleString()} scrobbles loaded</p>
 				{/if}
