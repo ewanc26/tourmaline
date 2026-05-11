@@ -18,13 +18,16 @@
 		<div class="flex flex-wrap gap-2">
 			<span class="pill">No tracking</span>
 			<span class="pill">No sign-in to browse</span>
-			<span class="pill">No server storage</span>
+			<span class="pill">No persistent server storage</span>
 		</div>
 
 		<p>
 			Tourmaline analyses your listening history from your Teal.fm scrobbles.
-			Your scrobbles are fetched, processed in your browser, and cached in IndexedDB for
-			faster repeat visits. No data is sent to any server other than your own PDS.
+			All fetching, analysis, and enrichment runs server-side. The server resolves your
+			identity, fetches scrobbles from your PDS, computes the profile, and enriches top
+			artists — then sends the results to your browser for display. No data is persisted
+			between visits; the in-memory session cache is lost when the serverless function
+			cold-starts.
 		</p>
 		<p>The network requests made are:</p>
 		<ul>
@@ -53,9 +56,9 @@
 			</li>
 		</ul>
 		<p>
-			Scrobbles are cached locally in your browser's IndexedDB. The server-side cache
-			(the <code>PUT /api/scrobbles/cache</code> endpoint) stores scrobbles in SQLite
-			to speed up subsequent visits, but this data is never shared or sold.
+			Scrobbles are held in an in-memory session on the server for the duration of the
+			analysis. This session expires after 10 minutes of inactivity and is never written
+			to disk. No persistent database is used.
 		</p>
 	</section>
 
@@ -76,8 +79,7 @@
 					<strong>Fetch scrobbles</strong>
 					<p>
 						<code>fm.teal.alpha.feed.play</code> records are fetched page by page from your
-						PDS. If you've visited before, only new scrobbles since the last visit are
-						fetched.
+						PDS. Fetched in batches to stay within serverless function time limits.
 					</p>
 				</div>
 			</li>
@@ -88,7 +90,7 @@
 					<p>
 						Scrobbles are aggregated into top artists, tracks, albums, daily counts, genre
 						profiles, mood mapping, era preference, diversity scoring, and obscurity
-						indexing.
+						indexing. All date range presets are computed at once so switching is instant.
 					</p>
 				</div>
 			</li>
@@ -98,8 +100,8 @@
 					<strong>Enrich</strong>
 					<p>
 						Top artists are enriched with genre data from MusicBrainz, listener counts from
-						Last.fm, and images from Deezer. This runs in the background after the profile
-						is already visible.
+						Last.fm, and images from Deezer. This runs in batches on the server after the
+						base profile is already computed.
 					</p>
 				</div>
 			</li>

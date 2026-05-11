@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getCached, getAllEnrichments } from '$lib/cache/server';
+import { getSession, updateSession } from '$lib/server/session';
 import { Aggregator } from '$lib/analysis/aggregator';
 import { buildGenreProfile, buildMonthlyGenres } from '$lib/analysis/genres';
 import { buildTimeline } from '$lib/analysis/timeline';
@@ -14,38 +14,34 @@ import { deriveSessions, buildSessionStats } from '$lib/analysis/sessions';
 import { buildOnThisDay } from '$lib/analysis/on-this-day';
 import { buildStoryRecap } from '$lib/analysis/story-recap';
 import { buildPersonality } from '$lib/analysis/personality';
-import { presetRange, filterScrobbles, type DateRangePreset } from '$lib/analysis/date-range';
-import type { ListenerProfile } from '$lib/types';
+import { filterScrobbles, presetRange, type DateRangePreset } from '$lib/analysis/date-range';
+import type { ListenerProfile, TealScrobble, ArtistInfo } from '$lib/types';
 import type { RequestHandler } from './$types';
 
-/**
- * GET: Compute a full listener profile from the server-side cache.
- * Only works when the server has persistent storage (not Vercel serverless).
- * The primary path is now the web worker (client-side).
- */
-export const GET: RequestHandler = async ({ params, url }) => {
-	const did = decodeURIComponent(params.did);
-	const rangeParam = (url.searchParams.get('range') ?? 'all') as DateRangePreset;
+type RangeKey = 'all' | '7d' | '30d' | '90d' | '365d';
+const RANGES: RangeKey[] = ['all', '7d', '30d', '90d', '365d'];
 
-	const row = getCached(did);
-	if (!row) {
-		return json({ cached: false });
-	}
+function computeProfile(
+	did: string,
+	scrobbles: TealScrobble[],
+	range: RangeKey,
+	artistInfos: Map<string, ArtistInfo>,
+	handle?: string
+): {
+	profile: ListenerProfile;
+	sessionStats: ReturnType<typeof buildSessionStats>;
+	onThisDay: ReturnType<typeof buildOnThisDay>;
+	storyRecap: ReturnType<typeof buildStoryRecap>;
+	personality: ReturnType<typeof buildPersonality>;
+} {
+	const filtered = range === 'all'
+		? scrobbles
+		: filterScrobbles(scrobbles, presetRange(range));
 
-	// Filter scrobbles by date range if requested
-	const scrobbles = rangeParam === 'all'
-		? row.scrobbles
-		: filterScrobbles(row.scrobbles, presetRange(rangeParam));
-
-	// Aggregate
 	const aggregator = new Aggregator();
-	aggregator.add(scrobbles);
+	aggregator.add(filtered);
 	const data = aggregator.snapshot();
 
-	// Load enrichment data
-	const artistInfos = getAllEnrichments();
-
-	// Run all analysis
 	const genres = buildGenreProfile(data, artistInfos);
 	const timeline = buildTimeline(data);
 	const diversity = diversityScore(data);
@@ -60,6 +56,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
 	const profile: ListenerProfile = {
 		did,
+		handle,
 		totalScrobbles: data.totalScrobbles,
 		uniqueArtists: data.uniqueArtists,
 		uniqueTracks: data.uniqueTracks,
@@ -88,19 +85,71 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		phases
 	};
 
-	// Derive extra data
-	const sessions = deriveSessions(scrobbles);
+	const sessions = deriveSessions(filtered);
 	const sessionStats = buildSessionStats(sessions);
-	const onThisDayEntries = buildOnThisDay(scrobbles);
+	const onThisDay = buildOnThisDay(filtered);
 	const storyRecap = buildStoryRecap(profile, '', phases);
 	const personality = buildPersonality(profile);
 
-	return json({
-		cached: true,
-		profile,
+	return { profile, sessionStats, onThisDay, storyRecap, personality };
+}
+
+export const GET: RequestHandler = async ({ params, url }) => {
+	const did = decodeURIComponent(params.did);
+	const session = getSession(did);
+
+	if (!session) {
+		return json({ error: 'No session found. Call /api/resolve first.' }, { status: 400 });
+	}
+
+	if (!session.fetchDone) {
+		return json({ error: 'Scrobbles not fully fetched yet.' }, { status: 400 });
+	}
+
+	// Compute profiles for ALL date ranges in one pass
+	const profiles: Record<string, ListenerProfile> = {};
+	let sessionStats = session.sessionStats;
+	let onThisDay = session.onThisDay;
+	let storyRecap = session.storyRecap;
+	let personality = session.personality;
+
+	for (const range of RANGES) {
+		if (session.profiles.has(range)) {
+			profiles[range] = session.profiles.get(range)!;
+			continue;
+		}
+
+		const result = computeProfile(did, session.scrobbles, range, session.enrichment, session.handle);
+		profiles[range] = result.profile;
+
+		// Store the "all" range's extra data on the session
+		if (range === 'all') {
+			sessionStats = result.sessionStats;
+			onThisDay = result.onThisDay;
+			storyRecap = result.storyRecap;
+			personality = result.personality;
+		}
+	}
+
+	// Cache all profiles on the session
+	for (const [range, profile] of Object.entries(profiles)) {
+		session.profiles.set(range, profile);
+	}
+
+	updateSession(did, {
+		profiles: session.profiles,
 		sessionStats,
-		onThisDay: onThisDayEntries,
+		onThisDay,
 		storyRecap,
 		personality
+	});
+
+	return json({
+		profiles,
+		sessionStats,
+		onThisDay,
+		storyRecap,
+		personality,
+		enrichmentDone: session.enrichQueue.length === 0
 	});
 };
