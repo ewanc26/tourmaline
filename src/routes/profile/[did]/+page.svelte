@@ -36,6 +36,20 @@
 		};
 	}
 
+	function formatTime(seconds: number): string {
+		if (seconds < 60) return `${seconds}s`;
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}m ${secs}s`;
+	}
+
+	function estimateRemaining(current: number, total: number, elapsedSec: number): string {
+		if (current === 0 || elapsedSec === 0) return '—';
+		const rate = current / elapsedSec;
+		const remaining = Math.ceil((total - current) / rate);
+		return formatTime(remaining);
+	}
+
 	let { data }: { data: { did: string; handle?: string; displayName?: string; avatar?: string; error?: string } } = $props();
 
 	// Identity from server load (already resolved)
@@ -49,6 +63,12 @@
 	let loaded = $state(0);
 	let enrichProgress = $state({ current: 0, total: 0 });
 	let error = $state(data.error ?? '');
+
+	// Timing
+	let fetchStartTime = $state(0);
+	let enrichStartTime = $state(0);
+	let elapsed = $state(0);
+	let enrichElapsed = $state(0);
 
 	// Profile data
 	let profiles = $state<Record<string, ListenerProfile>>({});
@@ -84,8 +104,14 @@
 		try {
 			// 1. Fetch scrobbles in batches
 			phase = 'fetching';
+			fetchStartTime = Date.now();
 			let batch = 0;
 			let fetchDone = false;
+
+			// Update elapsed time every second
+			const fetchTimer = setInterval(() => {
+				elapsed = Math.floor((Date.now() - fetchStartTime) / 1000);
+			}, 1000);
 
 			while (!fetchDone) {
 				const res = await fetch(`/api/scrobbles/${encodeURIComponent(did)}?continue=${batch > 0}`);
@@ -106,6 +132,9 @@
 				batch++;
 			}
 
+			clearInterval(fetchTimer);
+			elapsed = Math.floor((Date.now() - fetchStartTime) / 1000);
+
 			// 2. Compute profile (all date ranges at once)
 			phase = 'computing';
 			const profileRes = await fetch(`/api/profile/${encodeURIComponent(did)}`);
@@ -125,8 +154,13 @@
 			// 3. Enrich artists in batches
 			if (profile && !profileData.enrichmentDone) {
 				phase = 'enriching';
+				enrichStartTime = Date.now();
 				let enrichBatch = 0;
 				let enrichDone = false;
+
+				const enrichTimer = setInterval(() => {
+					enrichElapsed = Math.floor((Date.now() - enrichStartTime) / 1000);
+				}, 1000);
 
 				while (!enrichDone) {
 					const res = await fetch(`/api/enrich/${encodeURIComponent(did)}?continue=${enrichBatch > 0}`);
@@ -146,6 +180,9 @@
 					enrichDone = data.done;
 					enrichBatch++;
 				}
+
+				clearInterval(enrichTimer);
+				enrichElapsed = Math.floor((Date.now() - enrichStartTime) / 1000);
 
 				// Re-fetch profile with enrichment applied
 				const enrichedRes = await fetch(`/api/profile/${encodeURIComponent(did)}`);
@@ -206,7 +243,13 @@
 				<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
 					<div class="h-full w-1/3 animate-indeterminate rounded-full bg-green-600"></div>
 				</div>
-				<p class="mt-2 text-xs text-[var(--text-dim)]">{loaded.toLocaleString()} scrobbles loaded</p>
+				<p class="mt-2 text-xs text-[var(--text-dim)]">
+					{loaded.toLocaleString()} scrobbles loaded
+					{#if elapsed > 0}
+						· {formatTime(elapsed)} elapsed
+						· {loaded > 0 ? (loaded / elapsed).toFixed(0) : '—'} scrobbles/sec
+					{/if}
+				</p>
 			{:else if phase === 'computing'}
 				<div class="flex items-center gap-3">
 					<div class="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
@@ -220,6 +263,12 @@
 				<div class="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
 					<div class="h-full rounded-full bg-green-600 transition-all duration-300" style="width: {enrichProgress.total > 0 ? (enrichProgress.current / enrichProgress.total * 100) : 0}%"></div>
 				</div>
+				<p class="mt-2 text-xs text-[var(--text-dim)]">
+					{#if enrichElapsed > 0}
+						{formatTime(enrichElapsed)} elapsed
+						· {enrichProgress.current > 0 ? estimateRemaining(enrichProgress.current, enrichProgress.total, enrichElapsed) + ' remaining' : '—'}
+					{/if}
+				</p>
 			{/if}
 		</div>
 	{/if}
