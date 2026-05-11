@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { getCached, getAllEnrichments } from '$lib/cache/server';
 import { Aggregator } from '$lib/analysis/aggregator';
 import { buildGenreProfile, buildMonthlyGenres } from '$lib/analysis/genres';
 import { buildTimeline } from '$lib/analysis/timeline';
@@ -14,43 +15,35 @@ import { buildOnThisDay } from '$lib/analysis/on-this-day';
 import { buildStoryRecap } from '$lib/analysis/story-recap';
 import { buildPersonality } from '$lib/analysis/personality';
 import { presetRange, filterScrobbles, type DateRangePreset } from '$lib/analysis/date-range';
-import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
+import type { ListenerProfile } from '$lib/types';
 import type { RequestHandler } from './$types';
 
 /**
- * POST: Compute a full listener profile from scrobbles sent in the request body.
- * This is the primary path — no persistent server cache needed.
+ * GET: Compute a full listener profile from the server-side cache.
+ * Only works when the server has persistent storage (not Vercel serverless).
+ * The primary path is now the web worker (client-side).
  */
-export const POST: RequestHandler = async ({ params, request, url }) => {
+export const GET: RequestHandler = async ({ params, url }) => {
 	const did = decodeURIComponent(params.did);
 	const rangeParam = (url.searchParams.get('range') ?? 'all') as DateRangePreset;
 
-	const body = await request.json() as {
-		scrobbles?: TealScrobble[];
-		enrichment?: Record<string, ArtistInfo>;
-	};
-
-	if (!body.scrobbles || body.scrobbles.length === 0) {
-		return json({ error: 'scrobbles required' }, { status: 400 });
+	const row = getCached(did);
+	if (!row) {
+		return json({ cached: false });
 	}
 
 	// Filter scrobbles by date range if requested
 	const scrobbles = rangeParam === 'all'
-		? body.scrobbles
-		: filterScrobbles(body.scrobbles, presetRange(rangeParam));
+		? row.scrobbles
+		: filterScrobbles(row.scrobbles, presetRange(rangeParam));
 
 	// Aggregate
 	const aggregator = new Aggregator();
 	aggregator.add(scrobbles);
 	const data = aggregator.snapshot();
 
-	// Build artist info map from enrichment data
-	const artistInfos = new Map<string, ArtistInfo>();
-	if (body.enrichment) {
-		for (const [name, info] of Object.entries(body.enrichment)) {
-			artistInfos.set(name, info);
-		}
-	}
+	// Load enrichment data
+	const artistInfos = getAllEnrichments();
 
 	// Run all analysis
 	const genres = buildGenreProfile(data, artistInfos);
@@ -103,6 +96,7 @@ export const POST: RequestHandler = async ({ params, request, url }) => {
 	const personality = buildPersonality(profile);
 
 	return json({
+		cached: true,
 		profile,
 		sessionStats,
 		onThisDay: onThisDayEntries,
