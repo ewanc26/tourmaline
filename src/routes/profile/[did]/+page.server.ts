@@ -1,5 +1,4 @@
 import { resolveIdentifier, fetchBlueskyProfile } from '$lib/server/resolve';
-import { createSession } from '$lib/server/session';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -9,12 +8,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		const identity = await resolveIdentifier(identifier);
 		const bskyProfile = await fetchBlueskyProfile(identity.pdsUrl, identity.did);
 
-		// Create a session for subsequent API calls
-		createSession(identity.did, identity.pdsUrl, identity.handle);
-
 		return {
 			did: identity.did,
 			handle: identity.handle,
+			pdsUrl: identity.pdsUrl,
 			displayName: bskyProfile.displayName,
 			avatar: bskyProfile.avatar
 		};
@@ -22,6 +19,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		return {
 			did: '',
 			handle: undefined,
+			pdsUrl: undefined,
 			displayName: undefined,
 			avatar: undefined,
 			error: e instanceof Error ? e.message : 'Failed to resolve identifier'

@@ -1,58 +1,64 @@
 import { json } from '@sveltejs/kit';
-import { getSession, updateSession } from '$lib/server/session';
 import { enrichArtistBatch } from '$lib/server/enrich';
+import type { ArtistInfo } from '$lib/types';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ params, url }) => {
-	const did = decodeURIComponent(params.did);
-	const continueEnrich = url.searchParams.get('continue') === 'true';
+interface EnrichRequestBody {
+	queue: string[];
+	enrichment?: Record<string, ArtistInfo>;
+}
 
-	const session = getSession(did);
+export const POST: RequestHandler = async ({ request }) => {
+	let body: EnrichRequestBody;
+	try {
+		body = await request.json();
+	} catch {
+		return json({ error: 'Invalid JSON body.' }, { status: 400 });
+	}
 
-	// Cold start detection
-	if (!session) {
-		if (continueEnrich) {
-			return json({ coldStart: true });
-		}
-		return json({ error: 'No session found. Call /api/resolve first.' }, { status: 400 });
+	if (!body.queue || !Array.isArray(body.queue)) {
+		return json({ error: 'Missing queue array.' }, { status: 400 });
 	}
 
 	// Nothing left to enrich
-	if (session.enrichQueue.length === 0) {
+	if (body.queue.length === 0) {
+		const total = Object.keys(body.enrichment ?? {}).length;
 		return json({
-			current: session.enrichment.size,
-			total: session.enrichment.size,
-			done: true
+			current: total,
+			total,
+			done: true,
+			enrichment: body.enrichment ?? {},
+			remaining: []
 		});
 	}
 
-	// Initialise the enrich queue from the profile's top artists (first call)
-	if (!continueEnrich && session.enrichQueue.length === 0 && session.profiles.has('all')) {
-		const profile = session.profiles.get('all')!;
-		session.enrichQueue = profile.topArtists.map((a) => a.name);
+	// Build existing enrichment map
+	const existingEnrichment = new Map<string, ArtistInfo>();
+	if (body.enrichment) {
+		for (const [name, info] of Object.entries(body.enrichment)) {
+			existingEnrichment.set(name, info);
+		}
 	}
 
 	// Enrich a batch
 	try {
-		const result = await enrichArtistBatch(session.enrichQueue, session.enrichment);
+		const result = await enrichArtistBatch(body.queue, existingEnrichment);
 
-		// Merge enriched data into the session
+		// Build updated enrichment and remaining queue
+		const enrichment: Record<string, ArtistInfo> = { ...(body.enrichment ?? {}) };
 		for (const { name, info } of result.enriched) {
-			session.enrichment.set(name, info);
+			enrichment[name] = info;
 		}
 
-		// Update the enrich queue with remaining artists
-		session.enrichQueue = result.remaining;
-
-		updateSession(did, {
-			enrichQueue: session.enrichQueue,
-			enrichment: session.enrichment
-		});
+		const current = Object.keys(enrichment).length;
+		const total = current + result.remaining.length;
 
 		return json({
-			current: session.enrichment.size,
-			total: session.enrichment.size + session.enrichQueue.length,
-			done: session.enrichQueue.length === 0
+			current,
+			total,
+			done: result.remaining.length === 0,
+			enrichment,
+			remaining: result.remaining
 		});
 	} catch (e) {
 		const message = e instanceof Error ? e.message : 'Enrichment failed';
