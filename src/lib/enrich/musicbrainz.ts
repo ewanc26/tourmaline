@@ -30,7 +30,7 @@ interface MBSearchResult {
 export async function searchArtist(name: string): Promise<string | null> {
 	const cacheKey = `mb:search:${name.toLowerCase()}`;
 	const cached = getCached<string>(cacheKey);
-	if (cached !== null) return cached;
+	if (cached.hit) return cached.value;
 
 	const path = `/artist?query=artist:${encodeURIComponent(name)}&limit=1&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
 	const res = await fetch(`/api/musicbrainz${path}`);
@@ -45,7 +45,7 @@ export async function searchArtist(name: string): Promise<string | null> {
 export async function getArtistInfo(mbId: string): Promise<ArtistInfo | null> {
 	const cacheKey = `mb:artist:${mbId}`;
 	const cached = getCached<ArtistInfo>(cacheKey);
-	if (cached) return cached;
+	if (cached.hit) return cached.value;
 
 	const path = `/artist/${mbId}?inc=tags+genres+ratings&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
 	const res = await fetch(`/api/musicbrainz${path}`);
@@ -72,7 +72,7 @@ export async function getArtistInfo(mbId: string): Promise<ArtistInfo | null> {
 export async function getReleaseGroupDecade(mbId: string): Promise<string | null> {
 	const cacheKey = `mb:release-group:${mbId}`;
 	const cached = getCached<string>(cacheKey);
-	if (cached !== null) return cached;
+	if (cached.hit) return cached.value;
 
 	const path = `/release-group/${mbId}?inc=&fmt=json&client=${encodeURIComponent(USER_AGENT)}`;
 	const res = await fetch(`/api/musicbrainz${path}`);

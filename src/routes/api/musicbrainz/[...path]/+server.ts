@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
 const BASE_URL = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'Tourmaline/0.1.0 (https://github.com/ewanc26/tourmaline)';
+const USER_AGENT = 'Tourmaline/0.3.0 (https://github.com/ewanc26/tourmaline)';
 
 // MusicBrainz rate limit: 1 request per second per IP
 let lastRequestTime = 0;
@@ -45,11 +45,14 @@ export const GET: RequestHandler = async ({ url, fetch: serverFetch }) => {
 	});
 
 	const data = await res.text();
+	const cacheControl = res.ok
+		? 'public, max-age=86400'
+		: 'no-store';
 	return new Response(data, {
 		status: res.status,
 		headers: {
 			'Content-Type': 'application/json',
-			'Cache-Control': 'public, max-age=86400'
+			'Cache-Control': cacheControl
 		}
 	});
 };

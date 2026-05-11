@@ -28,7 +28,7 @@ export async function getArtistInfo(name: string): Promise<ArtistInfo | null> {
 
 	const cacheKey = `lfm:artist:${name.toLowerCase()}`;
 	const cached = getCached<ArtistInfo>(cacheKey);
-	if (cached) return cached;
+	if (cached.hit) return cached.value;
 
 	const params = new URLSearchParams({
 		method: 'artist.getinfo',
@@ -71,7 +71,7 @@ export async function getArtistTags(name: string): Promise<string[]> {
 export async function enrichWithLastfm(name: string): Promise<Partial<ArtistInfo> | null> {
 	const cacheKey = `lfm:enrich:${name.toLowerCase()}`;
 	const cached = getCached<Partial<ArtistInfo>>(cacheKey);
-	if (cached) return cached;
+	if (cached.hit) return cached.value;
 
 	try {
 		const info = await getArtistInfo(name);

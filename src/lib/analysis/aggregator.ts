@@ -66,6 +66,10 @@ export class Aggregator {
 
 	add(scrobbles: TealScrobble[]): void {
 		for (const scrobble of scrobbles) {
+			// Validate timestamp first — malformed scrobbles are discarded entirely
+			const date = new Date(scrobble.playedTime);
+			if (isNaN(date.getTime())) continue;
+
 			this.total++;
 
 			const artistName = scrobble.artists[0]?.name ?? 'Unknown';
@@ -99,9 +103,6 @@ export class Aggregator {
 
 			// Duration (normalised to seconds → minutes; default 3.5 min if absent)
 			this.minutesCount += normaliseDuration(scrobble.duration) / 60;
-
-			const date = new Date(scrobble.playedTime);
-			if (isNaN(date.getTime())) continue;
 			const hour = date.getHours();
 			const day = date.getDay();
 			this.byHour[hour]++;

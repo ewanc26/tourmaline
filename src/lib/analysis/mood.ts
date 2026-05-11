@@ -242,15 +242,15 @@ export function buildMoodProfile(
 	if (totalWeight === 0) return moodScores;
 
 	// ── Time-of-day mood weighting ────────────────────────────────────────
-	// Night listening (22:00–05:00) amplifies Dark, Melancholic, Atmospheric.
-	// Morning/daytime (06:00–11:00) amplifies Happy, Energetic.
-	// Late night (00:00–04:00) gives an extra boost to Dark and Atmospheric.
+	// Night listening (22:00–04:59) amplifies Dark, Melancholic, Atmospheric.
+	// Morning/daytime (06:00–11:59) amplifies Happy, Energetic.
+	// Late night (00:00–04:59) gives an extra boost to Dark and Atmospheric.
 
 	const totalScrobbles = data.scrobblesByHour.reduce((a, b) => a + b, 0);
 	if (totalScrobbles > 0) {
 		const nightHours = data.scrobblesByHour.slice(22, 24).reduce((a, b) => a + b, 0)
 			+ data.scrobblesByHour.slice(0, 5).reduce((a, b) => a + b, 0);
-		const lateNightHours = data.scrobblesByHour.slice(0, 4).reduce((a, b) => a + b, 0);
+		const lateNightHours = data.scrobblesByHour.slice(0, 5).reduce((a, b) => a + b, 0);
 		const morningHours = data.scrobblesByHour.slice(6, 12).reduce((a, b) => a + b, 0);
 
 		const nightRatio = nightHours / totalScrobbles;
