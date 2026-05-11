@@ -1,3 +1,5 @@
+import type { ListeningPhase } from '$lib/analysis/phases';
+
 export interface TealScrobble {
 	trackName: string;
 	artists: Array<{ name: string; mbId?: string }>;
@@ -90,6 +92,7 @@ export interface ListenerProfile {
 	monthlyGenres: MonthlyGenre[];
 	remarkableDays: RemarkableDay[];
 	discoveredArtists: DiscoveredArtist[];
+	phases: ListeningPhase[];
 }
 
 export interface CacheEntry {
