@@ -178,8 +178,11 @@ export async function fetchScrobblesBatched(
 		for (const record of data.records) {
 			const scrobble = parseScrobble(record.value);
 
-			// Stop if we've reached scrobbles we already have
-			if (since && scrobble.playedTime <= since) {
+			// Stop if we've reached scrobbles older than what we already have.
+			// Use strict < (not <=) to avoid skipping scrobbles that share
+			// the same timestamp as the cursor — multiple plays can land on
+			// the same second, and the cursor is the newest scrobble we have.
+			if (since && scrobble.playedTime < since) {
 				hitCursor = true;
 				break;
 			}

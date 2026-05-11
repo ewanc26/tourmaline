@@ -48,17 +48,20 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			status: retry.status,
 			headers: {
 				'Content-Type': 'application/json',
-				'Cache-Control': 'public, max-age=86400'
+				'Cache-Control': retry.ok ? 'public, max-age=86400' : 'no-store'
 			}
 		});
 	}
 
 	const data = await res.text();
+	const cacheControl = res.ok
+		? 'public, max-age=86400'
+		: 'no-store';
 	return new Response(data, {
 		status: res.status,
 		headers: {
 			'Content-Type': 'application/json',
-			'Cache-Control': 'public, max-age=86400'
+			'Cache-Control': cacheControl
 		}
 	});
 };

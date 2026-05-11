@@ -293,25 +293,31 @@
 				cursor = newScrobbles[0].playedTime;
 			}
 
-			// Write back to both caches
+			// Write back to both caches (deduplicate — scrobbles at the
+			// cursor timestamp may appear in both old and new sets)
 			const allScrobbles = cached
-				? [...newScrobbles, ...cached.scrobbles]
+				? [...newScrobbles, ...cached.scrobbles.filter(
+						(s) => !newScrobbles.some((n) => n.playedTime === s.playedTime && n.trackName === s.trackName)
+					)]
 				: [...newScrobbles];
 			if (allScrobbles.length > 0 && cursor) {
 				await writeCache(did, allScrobbles, cursor);
 			}
 
-			// 4. Enrich top artists — 6 concurrent workers
+			// 4. Enrich ALL artists, sorted by play count — 6 concurrent workers
 			phase = 'enriching';
-			const topArtists = aggregator.snapshot().topArtists;
-			enrichProgress = { current: 0, total: topArtists.length };
-			console.log(`[tourmaline] enriching ${topArtists.length} artists (6 concurrent)`);
+			const snap = aggregator.snapshot();
+			const allArtists = [...snap.artistPlayCounts.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.map(([name]) => name);
+			enrichProgress = { current: 0, total: allArtists.length };
+			console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
 
 			await runConcurrent(
-				topArtists,
+				allArtists,
 				6,
-				async ({ name }) => {
-					await enrichOneArtist(name, 0, topArtists.length);
+				async (name) => {
+					await enrichOneArtist(name, enrichProgress.current, allArtists.length);
 				},
 				async () => {
 					enrichProgress.current++;

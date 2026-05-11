@@ -54,7 +54,7 @@ function jsonp<T>(url: string): Promise<T> {
 export async function searchArtist(name: string): Promise<DeezerArtist | null> {
 	const cacheKey = `dz:search:${name.toLowerCase()}`;
 	const cached = getCached<DeezerArtist | null>(cacheKey);
-	if (cached !== null) return cached;
+	if (cached.hit) return cached.value;
 
 	try {
 		const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}`;
@@ -71,7 +71,7 @@ export async function searchArtist(name: string): Promise<DeezerArtist | null> {
 export async function getArtistImage(name: string): Promise<string | null> {
 	const cacheKey = `dz:image:${name.toLowerCase()}`;
 	const cached = getCached<string | null>(cacheKey);
-	if (cached !== null) return cached;
+	if (cached.hit) return cached.value;
 
 	const artist = await searchArtist(name);
 	const imageUrl = artist?.picture_medium ?? null;
