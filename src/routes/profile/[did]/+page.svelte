@@ -12,6 +12,9 @@
 	import { buildDiscoveredArtists } from '$lib/analysis/discovery';
 	import { deriveSessions, buildSessionStats } from '$lib/analysis/sessions';
 	import { buildOnThisDay } from '$lib/analysis/on-this-day';
+	import { buildListeningPhases } from '$lib/analysis/phases';
+	import { buildStoryRecap } from '$lib/analysis/story-recap';
+	import { presetRange, filterScrobbles, type DateRangePreset } from '$lib/analysis/date-range';
 	import { enrichArtist } from '$lib/enrich/musicbrainz';
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
@@ -34,6 +37,9 @@
 	import ProfileTabs from './ProfileTabs.svelte';
 	import ListeningSessions from './ListeningSessions.svelte';
 	import OnThisDay from './OnThisDay.svelte';
+	import DateRangePicker from './DateRangePicker.svelte';
+	import ListeningPhases from './ListeningPhases.svelte';
+	import StoryRecap from './StoryRecap.svelte';
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
@@ -66,6 +72,9 @@
 	if (urlTab === 'taste' || urlTab === 'habits' || urlTab === 'catalogue') {
 		activeTab = urlTab;
 	}
+
+	let dateRange = $state<DateRangePreset>('all');
+	let recomputing = $state(false);
 
 	const artistInfos = new Map<string, ArtistInfo>();
 
@@ -197,7 +206,8 @@
 			serviceOrigins: new Map(),
 			monthlyGenres: [],
 			remarkableDays: [],
-			discoveredArtists: []
+			discoveredArtists: [],
+			phases: []
 		};
 	}
 
@@ -212,6 +222,7 @@
 		const monthlyGenres = buildMonthlyGenres(data, artistInfos);
 		const remarkableDays = buildRemarkableDays(data);
 		const discoveredArtists = buildDiscoveredArtists(data, artistInfos);
+		const phases = buildListeningPhases(data, monthlyGenres, artistInfos);
 
 		profile = {
 			did,
@@ -240,9 +251,42 @@
 			serviceOrigins: data.serviceOrigins,
 			monthlyGenres,
 			remarkableDays,
-			discoveredArtists
+			discoveredArtists,
+			phases
 		};
 	}
+
+	/**
+	 * Recompute the profile for a custom date range.
+	 * Filters rawScrobbles, re-aggregates, and re-runs all analysis
+	 * using the already-enriched artistInfos map.
+	 */
+	function recomputeForRange(preset: DateRangePreset) {
+		if (preset === 'all' && rawScrobbles.length > 0) {
+			// "All" just re-runs the full pipeline
+			const fullAgg = new Aggregator();
+			fullAgg.add(rawScrobbles);
+			updateProfile(fullAgg.snapshot());
+			return;
+		}
+
+		const range = presetRange(preset);
+		const filtered = filterScrobbles(rawScrobbles, range);
+		if (filtered.length === 0) return;
+
+		recomputing = true;
+		const agg = new Aggregator();
+		agg.add(filtered);
+		updateProfile(agg.snapshot());
+		recomputing = false;
+	}
+
+	// React to date range changes
+	$effect(() => {
+		if (rawScrobbles.length > 0 && profile) {
+			recomputeForRange(dateRange);
+		}
+	});
 
 	onMount(async () => {
 		const identifier = decodeURIComponent(window.location.pathname.split('/').pop() ?? '');
@@ -440,11 +484,27 @@
 			</div>
 		</div>
 
+		<!-- Date range picker -->
+		<div class="mb-4 flex items-center gap-3 sm:mb-6">
+			<DateRangePicker bind:value={dateRange} />
+			{#if recomputing}
+				<span class="text-xs text-[var(--text-dim)] animate-pulse">Recalculating…</span>
+			{/if}
+		</div>
+
 		<!-- Tab navigation -->
 		<ProfileTabs bind:activeTab />
 
 		<!-- ── Overview tab ─────────────────────────────── -->
 		{#if activeTab === 'overview'}
+			<!-- Story recap -->
+			{#if rawScrobbles.length > 0}
+				{@const recap = buildStoryRecap(profile, bskyDisplayName ?? handle ?? did, profile.phases)}
+				<div class="mb-6 sm:mb-8">
+					<StoryRecap recap={recap} />
+				</div>
+			{/if}
+
 			{#if profile.totalMinutes > 0}
 				<div class="mb-6 sm:mb-8">
 					<MinutesListened minutes={profile.totalMinutes} />
@@ -495,6 +555,12 @@
 			{#if profile.monthlyGenres.length >= 3}
 				<div class="mb-6 sm:mb-8">
 					<MusicEvolution monthlyGenres={profile.monthlyGenres} />
+				</div>
+			{/if}
+
+			{#if profile.phases.length >= 2}
+				<div class="mb-6 sm:mb-8">
+					<ListeningPhases phases={profile.phases} />
 				</div>
 			{/if}
 
