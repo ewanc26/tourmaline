@@ -1,15 +1,16 @@
 <script lang="ts">
+
 	import { Music } from '@lucide/svelte';
 
-	let { origins = new Map<string, number>() }: { origins: Map<string, number> } = $props();
+	let { origins = {} }: { origins: Record<string, number> } = $props();
 
 	const entries = $derived(
-		[...origins.entries()]
+		Object.entries(origins)
 			.sort(([, a], [, b]) => b - a)
 			.slice(0, 6)
 	);
 
-	const total = $derived([...origins.values()].reduce((a, b) => a + b, 0));
+	const total = $derived(Object.values(origins).reduce((a, b) => a + b, 0));
 
 	/** Map common domains to friendly names. */
 	const FRIENDLY: Record<string, string> = {

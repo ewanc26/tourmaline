@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { TealScrobble } from '$lib/types';
+import type { ArtistInfo, TealScrobble } from '$lib/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_PATH = path.resolve(__dirname, '../../../../tourmaline.db');
@@ -31,9 +31,17 @@ function getDb(): Database.Database {
 			fetched_at INTEGER NOT NULL
 		)
 	`);
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS artist_enrichment (
+			name TEXT PRIMARY KEY,
+			data BLOB NOT NULL
+		)
+	`);
 
 	return db;
 }
+
+// ── Scrobble cache ──────────────────────────────────────────────────
 
 export function getCached(did: string): ScrobbleCacheRow | null {
 	const row = getDb()
@@ -71,4 +79,68 @@ export function setCached(did: string, cursor: string, scrobbles: TealScrobble[]
 
 export function isStale(row: ScrobbleCacheRow): boolean {
 	return Date.now() - row.fetchedAt > ONE_WEEK_MS;
+}
+
+// ── Artist enrichment cache ─────────────────────────────────────────
+
+export function getEnrichment(name: string): ArtistInfo | null {
+	const row = getDb()
+		.prepare('SELECT data FROM artist_enrichment WHERE name = ?')
+		.get(name) as { data: Buffer } | undefined;
+
+	if (!row) return null;
+
+	const json = row.data instanceof Buffer
+		? gunzipSync(row.data).toString('utf-8')
+		: row.data as unknown as string;
+
+	return JSON.parse(json) as ArtistInfo;
+}
+
+export function setEnrichment(name: string, info: ArtistInfo): void {
+	const compressed = gzipSync(Buffer.from(JSON.stringify(info), 'utf-8'));
+
+	const stmt = getDb().prepare(`
+		INSERT INTO artist_enrichment (name, data)
+		VALUES (?, ?)
+		ON CONFLICT(name) DO UPDATE SET
+			data = excluded.data
+	`);
+
+	stmt.run(name, compressed);
+}
+
+export function setEnrichmentBatch(entries: Array<{ name: string; data: ArtistInfo }>): void {
+	const stmt = getDb().prepare(`
+		INSERT INTO artist_enrichment (name, data)
+		VALUES (?, ?)
+		ON CONFLICT(name) DO UPDATE SET
+			data = excluded.data
+	`);
+
+	const insertMany = getDb().transaction((items: Array<{ name: string; data: ArtistInfo }>) => {
+		for (const { name, data } of items) {
+			const compressed = gzipSync(Buffer.from(JSON.stringify(data), 'utf-8'));
+			stmt.run(name, compressed);
+		}
+	});
+
+	insertMany(entries);
+}
+
+export function getAllEnrichments(): Map<string, ArtistInfo> {
+	const rows = getDb()
+		.prepare('SELECT name, data FROM artist_enrichment')
+		.all() as Array<{ name: string; data: Buffer }>;
+
+	const result = new Map<string, ArtistInfo>();
+
+	for (const row of rows) {
+		const json = row.data instanceof Buffer
+			? gunzipSync(row.data).toString('utf-8')
+			: row.data as unknown as string;
+		result.set(row.name, JSON.parse(json) as ArtistInfo);
+	}
+
+	return result;
 }

@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { Share2 } from '@lucide/svelte';
-	import { buildPersonality } from '$lib/analysis/personality';
 	import type { ListenerProfile } from '$lib/types';
+	import type { PersonalityProfile } from '$lib/analysis/personality';
 
-	let { profile, displayName }: { profile: ListenerProfile; displayName: string } = $props();
-
-	const personality = $derived(buildPersonality(profile));
+	let { profile, displayName, personality }: { profile: ListenerProfile; displayName: string; personality: PersonalityProfile } = $props();
 
 	const STORAGE_KEY = 'tourmaline:share';
 
