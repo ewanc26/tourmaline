@@ -88,7 +88,7 @@ export interface ListenerProfile {
 	obscurityIndex: number;
 	mood: Record<string, number>;
 	scrobblesByHour: number[];
-	serviceOrigins: Map<string, number>;
+	serviceOrigins: Record<string, number>;
 	monthlyGenres: MonthlyGenre[];
 	remarkableDays: RemarkableDay[];
 	discoveredArtists: DiscoveredArtist[];

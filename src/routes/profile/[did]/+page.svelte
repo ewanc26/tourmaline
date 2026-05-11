@@ -1,25 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolveIdentifier, fetchScrobblesBatched, fetchBlueskyProfile } from '$lib/atproto/resolve';
-	import { Aggregator } from '$lib/analysis/aggregator';
-	import { buildGenreProfile, buildMonthlyGenres } from '$lib/analysis/genres';
-	import { buildTimeline } from '$lib/analysis/timeline';
-	import { diversityScore, calculateGini } from '$lib/analysis/diversity';
-	import { calculateObscurity } from '$lib/analysis/obscurity';
-	import { buildMoodProfile } from '$lib/analysis/mood';
-	import { buildEraProfile } from '$lib/analysis/era';
-	import { buildRemarkableDays } from '$lib/analysis/remarkable-days';
-	import { buildDiscoveredArtists } from '$lib/analysis/discovery';
-	import { deriveSessions, buildSessionStats } from '$lib/analysis/sessions';
-	import { buildOnThisDay } from '$lib/analysis/on-this-day';
-	import { buildListeningPhases } from '$lib/analysis/phases';
-	import { buildStoryRecap } from '$lib/analysis/story-recap';
-	import { presetRange, filterScrobbles, type DateRangePreset } from '$lib/analysis/date-range';
 	import { enrichArtist } from '$lib/enrich/musicbrainz';
 	import { enrichWithLastfm } from '$lib/enrich/lastfm';
 	import { getArtistImage } from '$lib/enrich/deezer';
 	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
 	import type { ArtistInfo, ListenerProfile, TealScrobble } from '$lib/types';
+	import type { SessionStats } from '$lib/analysis/sessions';
+	import type { OnThisDayEntry } from '$lib/analysis/on-this-day';
+	import type { StoryRecap as StoryRecapData } from '$lib/analysis/story-recap';
+	import type { PersonalityProfile } from '$lib/analysis/personality';
+	import type { DateRangePreset } from '$lib/analysis/date-range';
 	import { getCached as getIdbCache, setCached as setIdbCache } from '$lib/cache/client';
 	import GenreChart from './GenreChart.svelte';
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
@@ -62,6 +53,10 @@
 	let enrichProgress = $state({ current: 0, total: 0 });
 	let error = $state('');
 	let profile = $state<ListenerProfile | null>(null);
+	let sessionStats = $state<SessionStats | null>(null);
+	let onThisDayEntries = $state<OnThisDayEntry[]>([]);
+	let storyRecap_ = $state<StoryRecapData | null>(null);
+	let personality = $state<PersonalityProfile | null>(null);
 	let rawScrobbles = $state<TealScrobble[]>([]);
 
 	type Tab = 'overview' | 'taste' | 'habits' | 'catalogue';
@@ -95,52 +90,63 @@
 		}
 	}
 
+	/** Fetch the computed profile from the server endpoint. */
+	async function fetchServerProfile(range?: DateRangePreset): Promise<void> {
+		if (!did) return;
+		const rangeParam = range ?? dateRange;
+		const url = `/api/profile/${encodeURIComponent(did)}?range=${rangeParam}`;
+		try {
+			const res = await fetch(url);
+			if (!res.ok) return;
+			const body = await res.json();
+			if (body.cached && body.profile) {
+				profile = body.profile;
+				sessionStats = body.sessionStats ?? null;
+				onThisDayEntries = body.onThisDay ?? [];
+				storyRecap_ = body.storyRecap ?? null;
+				personality = body.personality ?? null;
+			}
+		} catch {
+			// server profile fetch failure — keep existing profile
+		}
+	}
+
+	/** Push enrichment data to the server in batches. */
+	let enrichmentBatch: Array<{ name: string; data: ArtistInfo }> = [];
+	let enrichmentBatchTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function pushEnrichment(name: string, info: ArtistInfo): void {
+		enrichmentBatch.push({ name, data: info });
+		if (!enrichmentBatchTimer) {
+			enrichmentBatchTimer = setTimeout(flushEnrichment, 500);
+		}
+		if (enrichmentBatch.length >= 5) {
+			flushEnrichment();
+		}
+	}
+
+	async function flushEnrichment(): Promise<void> {
+		if (enrichmentBatch.length === 0) return;
+		const batch = enrichmentBatch;
+		enrichmentBatch = [];
+		if (enrichmentBatchTimer) {
+			clearTimeout(enrichmentBatchTimer);
+			enrichmentBatchTimer = null;
+		}
+		try {
+			await fetch('/api/enrichment', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ artists: batch })
+			});
+		} catch {
+			// enrichment push is non-critical
+		}
+	}
+
 	/** Yield to the browser so it can paint before we continue. */
 	function yieldFrame(): Promise<void> {
 		return new Promise((resolve) => requestAnimationFrame(() => resolve()));
-	}
-
-	/**
-	 * Batched profile updater.
-	 *
-	 * Instead of calling updateProfile after every single artist
-	 * (which triggers full re-analysis and chart re-renders),
-	 * this batches updates: at most once every `batchSize` items
-	 * or every `intervalMs` milliseconds, whichever fires first.
-	 *
-	 * Call `flush()` after the loop to push the final update.
-	 */
-	function createBatchedUpdater(
-		aggregator: Aggregator,
-		batchSize = 5,
-		intervalMs = 300
-	) {
-		let pending = 0;
-		let timer: ReturnType<typeof setTimeout> | null = null;
-		let lastUpdate = 0;
-
-		function flush() {
-			pending = 0;
-			if (timer) {
-				clearTimeout(timer);
-				timer = null;
-			}
-			lastUpdate = performance.now();
-			updateProfile(aggregator.snapshot());
-		}
-
-		function tick() {
-			pending++;
-			const now = performance.now();
-
-			if (pending >= batchSize || now - lastUpdate >= intervalMs) {
-				flush();
-			} else if (!timer) {
-				timer = setTimeout(flush, intervalMs - (now - lastUpdate));
-			}
-		}
-
-		return { tick, flush };
 	}
 
 	/**
@@ -168,10 +174,13 @@
 
 	/** Enrich a single artist with MusicBrainz, Last.fm, and Deezer data. */
 	async function enrichOneArtist(name: string, i: number, total: number): Promise<void> {
+		let info: ArtistInfo | undefined;
+
 		// MusicBrainz
 		try {
-			const info = await enrichArtist(name);
-			if (info) {
+			const mbInfo = await enrichArtist(name);
+			if (mbInfo) {
+				info = mbInfo;
 				artistInfos.set(name, info);
 				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → MusicBrainz (genres: ${info.genres.length}, tags: ${info.tags.length})`);
 			} else {
@@ -187,9 +196,10 @@
 			if (lfmData) {
 				const existing = artistInfos.get(name);
 				if (existing) {
-					artistInfos.set(name, { ...existing, ...lfmData });
+					info = { ...existing, ...lfmData };
+					artistInfos.set(name, info);
 				} else {
-					artistInfos.set(name, {
+					info = {
 						name,
 						genres: [],
 						tags: lfmData.tags ?? [],
@@ -197,7 +207,8 @@
 						listenerCount: lfmData.listenerCount,
 						playCount: lfmData.playCount,
 						imageUrl: lfmData.imageUrl
-					});
+					};
+					artistInfos.set(name, info);
 				}
 				console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Last.fm (listeners: ${lfmData.listenerCount ?? '?'}, image: ${lfmData.imageUrl ? 'yes' : 'no'})`);
 			}
@@ -212,9 +223,11 @@
 				const imageUrl = await getArtistImage(name);
 				if (imageUrl) {
 					if (existing) {
-						artistInfos.set(name, { ...existing, imageUrl });
+						info = { ...existing, imageUrl };
+						artistInfos.set(name, info);
 					} else {
-						artistInfos.set(name, { name, genres: [], tags: [], similar: [], imageUrl });
+						info = { name, genres: [], tags: [], similar: [], imageUrl };
+						artistInfos.set(name, info);
 					}
 					console.log(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer image: ${imageUrl}`);
 				} else {
@@ -223,6 +236,11 @@
 			} catch (e) {
 				console.warn(`[tourmaline] [${i + 1}/${total}] ${name} → Deezer failed:`, e);
 			}
+		}
+
+		// Push enrichment data to server
+		if (info) {
+			pushEnrichment(name, info);
 		}
 	}
 
@@ -246,7 +264,7 @@
 			obscurityIndex: 50,
 			mood: {},
 			scrobblesByHour: new Array(24).fill(0),
-			serviceOrigins: new Map(),
+			serviceOrigins: {},
 			monthlyGenres: [],
 			remarkableDays: [],
 			discoveredArtists: [],
@@ -254,82 +272,19 @@
 		};
 	}
 
-	function updateProfile(data: ReturnType<Aggregator['snapshot']>) {
-		const genres = buildGenreProfile(data, artistInfos);
-		const timeline = buildTimeline(data);
-		const diversity = diversityScore(data);
-		const gini = calculateGini(data);
-		const obscurity = calculateObscurity(data, artistInfos);
-		const mood = buildMoodProfile(data, artistInfos);
-		const era = buildEraProfile(data, artistInfos);
-		const monthlyGenres = buildMonthlyGenres(data, artistInfos);
-		const remarkableDays = buildRemarkableDays(data);
-		const discoveredArtists = buildDiscoveredArtists(data, artistInfos);
-		const phases = buildListeningPhases(data, monthlyGenres, artistInfos);
+	// React to date range changes — fetch from server
+	let profileReady = $state(false);
 
-		profile = {
-			did,
-			handle,
-			totalScrobbles: data.totalScrobbles,
-			uniqueArtists: data.uniqueArtists,
-			uniqueTracks: data.uniqueTracks,
-			totalMinutes: data.totalMinutes,
-			topArtists: data.topArtists.map((a) => ({
-				...a,
-				imageUrl: artistInfos.get(a.name)?.imageUrl
-			})),
-			topTracks: data.topTracks,
-			topAlbums: data.topAlbums,
-			genres,
-			timeline,
-			dailyScrobbles: [...data.dailyScrobbles.entries()]
-				.map(([date, count]) => ({ date, count }))
-				.sort((a, b) => a.date.localeCompare(b.date)),
-			era,
-			diversityScore: diversity,
-			giniCoefficient: gini,
-			obscurityIndex: obscurity,
-			mood,
-			scrobblesByHour: data.scrobblesByHour,
-			serviceOrigins: data.serviceOrigins,
-			monthlyGenres,
-			remarkableDays,
-			discoveredArtists,
-			phases
-		};
-	}
-
-	/**
-	 * Recompute the profile for a custom date range.
-	 * Filters rawScrobbles, re-aggregates, and re-runs all analysis
-	 * using the already-enriched artistInfos map.
-	 */
-	function recomputeForRange(preset: DateRangePreset) {
-		if (preset === 'all' && rawScrobbles.length > 0) {
-			// "All" just re-runs the full pipeline
-			const fullAgg = new Aggregator();
-			fullAgg.add(rawScrobbles);
-			updateProfile(fullAgg.snapshot());
-			return;
-		}
-
-		const range = presetRange(preset);
-		const filtered = filterScrobbles(rawScrobbles, range);
-		if (filtered.length === 0) return;
-
-		recomputing = true;
-		const agg = new Aggregator();
-		agg.add(filtered);
-		updateProfile(agg.snapshot());
-		recomputing = false;
-	}
-
-	// React to date range changes
 	$effect(() => {
-		if (rawScrobbles.length > 0 && profile) {
-			recomputeForRange(dateRange);
+		const range = dateRange; // explicit dependency
+		if (profileReady && did && profile && profile.totalScrobbles > 0) {
+			recomputing = true;
+			fetchServerProfile(range).finally(() => { recomputing = false; });
 		}
 	});
+
+	// Re-fetch profile periodically during enrichment
+	let enrichProfileTimer: ReturnType<typeof setInterval> | null = null;
 
 	onMount(async () => {
 		const identifier = decodeURIComponent(window.location.pathname.split('/').pop() ?? '');
@@ -339,7 +294,6 @@
 			(window as unknown as Record<string, string>).__LASTFM_API_KEY = data.lastfmApiKey;
 		}
 
-		const aggregator = new Aggregator();
 		const t0 = performance.now();
 		let pdsUrl = '';
 		let cursor: string | undefined;
@@ -365,13 +319,9 @@
 			const cached = await getIdbCache(did);
 			if (cached && cached.scrobbles.length > 0) {
 				fromCache = true;
-				aggregator.add(cached.scrobbles);
 				loaded = cached.scrobbles.length;
 				cursor = cached.cursor;
 				rawScrobbles = cached.scrobbles;
-				updateProfile(aggregator.snapshot());
-				phase = 'complete';
-				console.log(`[tourmaline] loaded ${cached.scrobbles.length} scrobbles from cache (cursor: ${cursor})`);
 			}
 
 			// 3. Fetch scrobbles from PDS (incremental if cache hit)
@@ -381,9 +331,7 @@
 				pdsUrl,
 				did,
 				async (batch, totalSoFar) => {
-					aggregator.add(batch);
 					loaded = totalSoFar;
-					updateProfile(aggregator.snapshot());
 					await yieldFrame();
 				},
 				undefined,
@@ -413,32 +361,47 @@
 			}
 			rawScrobbles = allScrobbles;
 
-			// 4. Enrich ALL artists, sorted by play count — 6 concurrent workers
-			phase = 'enriching';
-			const snap = aggregator.snapshot();
-			const allArtists = [...snap.artistPlayCounts.entries()]
-				.sort((a, b) => b[1] - a[1])
-				.map(([name]) => name);
-			enrichProgress = { current: 0, total: allArtists.length };
-			console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
+			// 4. Fetch profile from server (server runs all analysis)
+			await fetchServerProfile();
+			phase = 'complete';
+			profileReady = true;
+			console.log(`[tourmaline] loaded ${loaded} scrobbles, profile fetched from server`);
 
-			const batchedUpdater = createBatchedUpdater(aggregator);
+			// 5. Enrich ALL artists, sorted by play count — 6 concurrent workers
+			if (profile && profile.topArtists.length > 0) {
+				phase = 'enriching';
+				const allArtists = [...profile.topArtists]
+					.sort((a, b) => b.count - a.count)
+					.map((a) => a.name);
+				enrichProgress = { current: 0, total: allArtists.length };
+				console.log(`[tourmaline] enriching ${allArtists.length} artists (6 concurrent)`);
 
-			await runConcurrent(
-				allArtists,
-				6,
-				async (name) => {
-					await enrichOneArtist(name, enrichProgress.current, allArtists.length);
-				},
-				async () => {
-					enrichProgress.current++;
-					batchedUpdater.tick();
-					await yieldFrame();
+				// Re-fetch profile from server every 2 seconds during enrichment
+				enrichProfileTimer = setInterval(() => {
+					fetchServerProfile();
+				}, 2000);
+
+				await runConcurrent(
+					allArtists,
+					6,
+					async (name) => {
+						await enrichOneArtist(name, enrichProgress.current, allArtists.length);
+					},
+					async () => {
+						enrichProgress.current++;
+						await yieldFrame();
+					}
+				);
+
+				// Flush remaining enrichment data and fetch final profile
+				await flushEnrichment();
+				if (enrichProfileTimer) {
+					clearInterval(enrichProfileTimer);
+					enrichProfileTimer = null;
 				}
-			);
+				await fetchServerProfile();
+			}
 
-			// Flush any remaining pending updates
-			batchedUpdater.flush();
 			phase = 'complete';
 			console.log(`[tourmaline] complete in ${((performance.now() - t0) / 1000).toFixed(1)}s — ${loaded} scrobbles, ${artistInfos.size} artists enriched`);
 		} catch (e) {
@@ -514,7 +477,7 @@
 		</div>
 	{/if}
 
-	<!-- Profile content — live updates as data streams in -->
+	<!-- Profile content -->
 	{#if profile && profile.totalScrobbles > 0}
 		<!-- Stats row (always visible) -->
 		<div class="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 sm:grid-cols-4">
@@ -550,10 +513,9 @@
 		<!-- ── Overview tab ─────────────────────────────── -->
 		{#if activeTab === 'overview'}
 			<!-- Story recap -->
-			{#if rawScrobbles.length > 0}
-				{@const recap = buildStoryRecap(profile, bskyDisplayName ?? handle ?? did, profile.phases)}
+			{#if storyRecap_}
 				<div class="mb-6 sm:mb-8">
-					<StoryRecap recap={recap} />
+					<StoryRecap recap={storyRecap_} />
 				</div>
 			{/if}
 
@@ -569,9 +531,9 @@
 				</div>
 			{/if}
 
-			{#if profile.genres.length > 0}
+			{#if personality}
 				<div class="mb-8">
-					<PersonalityCard profile={profile} displayName={bskyDisplayName ?? handle ?? did} />
+					<PersonalityCard profile={profile} displayName={bskyDisplayName ?? handle ?? did} {personality} />
 				</div>
 			{/if}
 
@@ -638,15 +600,14 @@
 				</div>
 			{/if}
 
-			{#if profile.serviceOrigins.size > 0}
+			{#if Object.keys(profile.serviceOrigins).length > 0}
 				<div class="mb-6 sm:mb-8">
 					<p class="mb-2 font-mono text-xs uppercase tracking-wide text-[var(--text-dim)]">Scrobble sources</p>
 					<ServiceOrigins origins={profile.serviceOrigins} />
 				</div>
 			{/if}
 
-			{#if rawScrobbles.length > 0}
-				{@const sessionStats = buildSessionStats(deriveSessions(rawScrobbles))}
+			{#if sessionStats}
 				<div class="mb-6 sm:mb-8">
 					<ListeningSessions stats={sessionStats} />
 				</div>
@@ -714,13 +675,10 @@
 				</div>
 			{/if}
 
-			{#if rawScrobbles.length > 0}
-				{@const onThisDayEntries = buildOnThisDay(rawScrobbles)}
-				{#if onThisDayEntries.length > 0}
-					<div class="mb-6 sm:mb-8">
-						<OnThisDay entries={onThisDayEntries} />
-					</div>
-				{/if}
+			{#if onThisDayEntries.length > 0}
+				<div class="mb-6 sm:mb-8">
+					<OnThisDay entries={onThisDayEntries} />
+				</div>
 			{/if}
 		{/if}
 	{/if}
