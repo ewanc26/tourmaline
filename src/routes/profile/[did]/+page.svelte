@@ -1,12 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { renderNoiseAvatar } from '@ewanc26/noise-avatar';
-	import type { ListenerProfile } from '$lib/types';
+	import type { ListenerProfile, TealScrobble, ArtistInfo } from '$lib/types';
 	import type { SessionStats } from '$lib/analysis/sessions';
 	import type { OnThisDayEntry } from '$lib/analysis/on-this-day';
 	import type { StoryRecap as StoryRecapData } from '$lib/analysis/story-recap';
 	import type { PersonalityProfile } from '$lib/analysis/personality';
 	import type { DateRangePreset } from '$lib/analysis/date-range';
+	import { Aggregator } from '$lib/analysis/aggregator';
+	import { buildGenreProfile, buildMonthlyGenres } from '$lib/analysis/genres';
+	import { buildTimeline } from '$lib/analysis/timeline';
+	import { diversityScore, calculateGini } from '$lib/analysis/diversity';
+	import { calculateObscurity } from '$lib/analysis/obscurity';
+	import { buildMoodProfile } from '$lib/analysis/mood';
+	import { buildEraProfile } from '$lib/analysis/era';
+	import { buildRemarkableDays } from '$lib/analysis/remarkable-days';
+	import { buildDiscoveredArtists } from '$lib/analysis/discovery';
+	import { buildListeningPhases } from '$lib/analysis/phases';
+	import { deriveSessions, buildSessionStats } from '$lib/analysis/sessions';
+	import { buildOnThisDay } from '$lib/analysis/on-this-day';
+	import { buildStoryRecap } from '$lib/analysis/story-recap';
+	import { buildPersonality } from '$lib/analysis/personality';
+	import { filterScrobbles, presetRange } from '$lib/analysis/date-range';
 	import GenreChart from './GenreChart.svelte';
 	import TimelineHeatmap from './TimelineHeatmap.svelte';
 	import MoodRadar from './MoodRadar.svelte';
@@ -26,6 +41,82 @@
 	import DateRangePicker from './DateRangePicker.svelte';
 	import ListeningPhases from './ListeningPhases.svelte';
 	import StoryRecap from './StoryRecap.svelte';
+
+	type RangeKey = 'all' | '7d' | '30d' | '90d' | '365d';
+	const RANGES: RangeKey[] = ['all', '7d', '30d', '90d', '365d'];
+
+	function computeProfile(
+		did: string,
+		scrobbles: TealScrobble[],
+		range: RangeKey,
+		artistInfos: Map<string, ArtistInfo>,
+		handle?: string
+	): {
+		profile: ListenerProfile;
+		sessionStats: ReturnType<typeof buildSessionStats>;
+		onThisDay: ReturnType<typeof buildOnThisDay>;
+		storyRecap: ReturnType<typeof buildStoryRecap>;
+		personality: ReturnType<typeof buildPersonality>;
+	} {
+		const filtered = range === 'all'
+			? scrobbles
+			: filterScrobbles(scrobbles, presetRange(range));
+
+		const aggregator = new Aggregator();
+		aggregator.add(filtered);
+		const data = aggregator.snapshot();
+
+		const genres = buildGenreProfile(data, artistInfos);
+		const timeline = buildTimeline(data);
+		const diversity = diversityScore(data);
+		const gini = calculateGini(data);
+		const obscurity = calculateObscurity(data, artistInfos);
+		const mood = buildMoodProfile(data, artistInfos);
+		const era = buildEraProfile(data, artistInfos);
+		const monthlyGenres = buildMonthlyGenres(data, artistInfos);
+		const remarkableDays = buildRemarkableDays(data);
+		const discoveredArtists = buildDiscoveredArtists(data, artistInfos);
+		const phases = buildListeningPhases(data, monthlyGenres, artistInfos);
+
+		const profile: ListenerProfile = {
+			did,
+			handle,
+			totalScrobbles: data.totalScrobbles,
+			uniqueArtists: data.uniqueArtists,
+			uniqueTracks: data.uniqueTracks,
+			totalMinutes: data.totalMinutes,
+			topArtists: data.topArtists.map((a) => ({
+				...a,
+				imageUrl: artistInfos.get(a.name)?.imageUrl
+			})),
+			topTracks: data.topTracks,
+			topAlbums: data.topAlbums,
+			genres,
+			timeline,
+			dailyScrobbles: [...data.dailyScrobbles.entries()]
+				.map(([date, count]) => ({ date, count }))
+				.sort((a, b) => a.date.localeCompare(b.date)),
+			era,
+			diversityScore: diversity,
+			giniCoefficient: gini,
+			obscurityIndex: obscurity,
+			mood,
+			scrobblesByHour: data.scrobblesByHour,
+			serviceOrigins: Object.fromEntries(data.serviceOrigins),
+			monthlyGenres,
+			remarkableDays,
+			discoveredArtists,
+			phases
+		};
+
+		const sessions = deriveSessions(filtered);
+		const sessionStats = buildSessionStats(sessions);
+		const onThisDay = buildOnThisDay(filtered);
+		const storyRecap = buildStoryRecap(profile, '', phases);
+		const personality = buildPersonality(profile);
+
+		return { profile, sessionStats, onThisDay, storyRecap, personality };
+	}
 
 	function noiseAvatar(canvas: HTMLCanvasElement, seed: string) {
 		renderNoiseAvatar(canvas, seed, { displaySize: 32, gridSize: 5 });
@@ -50,11 +141,12 @@
 		return formatTime(remaining);
 	}
 
-	let { data }: { data: { did: string; handle?: string; displayName?: string; avatar?: string; error?: string } } = $props();
+	let { data }: { data: { did: string; handle?: string; pdsUrl?: string; displayName?: string; avatar?: string; error?: string } } = $props();
 
 	// Identity from server load (already resolved)
 	let did = $state(data.did);
 	let handle = $state(data.handle);
+	let pdsUrl = $state(data.pdsUrl);
 	let bskyDisplayName = $state(data.displayName);
 	let bskyAvatar = $state(data.avatar);
 
@@ -97,65 +189,68 @@
 	});
 
 	onMount(async () => {
-		if (error || !did) return;
+		if (error || !did || !pdsUrl) return;
 
 		const t0 = performance.now();
 
+		// Client accumulates scrobbles and runs analysis locally
+		const allScrobbles: TealScrobble[] = [];
+		let cursor: string | null = null;
+		const artistInfos = new Map<string, ArtistInfo>();
+
 		try {
-			// 1. Fetch scrobbles in batches
+			// 1. Fetch scrobbles in batches (stateless endpoint)
 			phase = 'fetching';
 			fetchStartTime = Date.now();
-			let batch = 0;
 			let fetchDone = false;
 
-			// Update elapsed time every second
 			const fetchTimer = setInterval(() => {
 				elapsed = Math.floor((Date.now() - fetchStartTime) / 1000);
 			}, 1000);
 
 			while (!fetchDone) {
-				const res = await fetch(`/api/scrobbles/${encodeURIComponent(did)}?continue=${batch > 0}`);
-				const data = await res.json();
+				const params = new URLSearchParams({ pdsUrl });
+				if (cursor) params.set('cursor', cursor);
 
-				if (data.coldStart) {
-					// Server restarted — start fresh
-					batch = 0;
-					continue;
-				}
+				const res = await fetch(`/api/scrobbles/${encodeURIComponent(did)}?${params}`);
+				const data = await res.json();
 
 				if (data.error) {
 					throw new Error(data.error);
 				}
 
-				loaded = data.loaded;
+				allScrobbles.push(...data.scrobbles);
+				loaded = allScrobbles.length;
+				cursor = data.cursor;
 				fetchDone = data.done;
-				batch++;
 			}
 
 			clearInterval(fetchTimer);
 			elapsed = Math.floor((Date.now() - fetchStartTime) / 1000);
 
-			// 2. Compute profile (all date ranges at once)
+			// 2. Compute all profiles client-side (pure functions, no API keys)
 			phase = 'computing';
-			const profileRes = await fetch(`/api/profile/${encodeURIComponent(did)}`);
-			const profileData = await profileRes.json();
 
-			if (profileData.error) {
-				throw new Error(profileData.error);
+			for (const range of RANGES) {
+				const result = computeProfile(did, allScrobbles, range, artistInfos, handle);
+				profiles[range] = result.profile;
+
+				if (range === 'all') {
+					sessionStats = result.sessionStats;
+					onThisDayEntries = result.onThisDay;
+					storyRecap_ = result.storyRecap;
+					personality = result.personality;
+				}
 			}
-
-			profiles = profileData.profiles;
 			profile = profiles[dateRange];
-			sessionStats = profileData.sessionStats;
-			onThisDayEntries = profileData.onThisDay ?? [];
-			storyRecap_ = profileData.storyRecap ?? null;
-			personality = profileData.personality ?? null;
 
-			// 3. Enrich artists in batches
-			if (profile && !profileData.enrichmentDone) {
+			// 3. Enrich top artists server-side (needs API keys)
+			const topArtists = profiles.all.topArtists.map((a) => a.name);
+			if (topArtists.length > 0) {
 				phase = 'enriching';
 				enrichStartTime = Date.now();
-				let enrichBatch = 0;
+				let enrichQueue = [...topArtists];
+				let enrichment: Record<string, ArtistInfo> = {};
 				let enrichDone = false;
 
 				const enrichTimer = setInterval(() => {
@@ -163,38 +258,44 @@
 				}, 1000);
 
 				while (!enrichDone) {
-					const res = await fetch(`/api/enrich/${encodeURIComponent(did)}?continue=${enrichBatch > 0}`);
+					const res = await fetch(`/api/enrich/${encodeURIComponent(did)}`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ queue: enrichQueue, enrichment })
+					});
 					const data = await res.json();
-
-					if (data.coldStart) {
-						enrichBatch = 0;
-						continue;
-					}
 
 					if (data.error) {
 						console.warn('[tourmaline] enrichment error:', data.error);
 						break;
 					}
 
+					enrichment = data.enrichment;
+					enrichQueue = data.remaining;
 					enrichProgress = { current: data.current, total: data.total };
 					enrichDone = data.done;
-					enrichBatch++;
 				}
 
 				clearInterval(enrichTimer);
 				enrichElapsed = Math.floor((Date.now() - enrichStartTime) / 1000);
 
-				// Re-fetch profile with enrichment applied
-				const enrichedRes = await fetch(`/api/profile/${encodeURIComponent(did)}`);
-				const enrichedData = await enrichedRes.json();
-				if (!enrichedData.error) {
-					profiles = enrichedData.profiles;
-					profile = profiles[dateRange];
-					sessionStats = enrichedData.sessionStats;
-					onThisDayEntries = enrichedData.onThisDay ?? [];
-					storyRecap_ = enrichedData.storyRecap ?? null;
-					personality = enrichedData.personality ?? null;
+				// Re-compute profiles with enrichment applied
+				for (const [name, info] of Object.entries(enrichment)) {
+					artistInfos.set(name, info);
 				}
+
+				for (const range of RANGES) {
+					const result = computeProfile(did, allScrobbles, range, artistInfos, handle);
+					profiles[range] = result.profile;
+
+					if (range === 'all') {
+						sessionStats = result.sessionStats;
+						onThisDayEntries = result.onThisDay;
+						storyRecap_ = result.storyRecap;
+						personality = result.personality;
+					}
+				}
+				profile = profiles[dateRange];
 			}
 
 			phase = 'complete';
