@@ -1,9 +1,92 @@
 <script lang="ts">
-	import { BarChart3, Brain, CalendarDays, Fingerprint, Gem, Music, Shield, Eye } from '@lucide/svelte';
+	import { onMount } from 'svelte';
+	import { BarChart3, Brain, CalendarDays, Fingerprint, Gem, Music, Shield, Eye, Search } from '@lucide/svelte';
+
+	interface ActorResult {
+		did: string;
+		handle: string;
+		displayName?: string;
+		avatar?: string;
+	}
 
 	let identifier = $state('');
 	let loading = $state(false);
 	let error = $state('');
+
+	// Autocomplete state
+	let suggestions = $state<ActorResult[]>([]);
+	let showSuggestions = $state(false);
+	let searchLoading = $state(false);
+	let selectedIndex = $state(-1);
+	let inputRef: HTMLInputElement | undefined = $state();
+	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async function searchActors(query: string): Promise<ActorResult[]> {
+		if (query.length < 2) return [];
+		try {
+			const res = await fetch(
+				`https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q=${encodeURIComponent(query)}&limit=8`
+			);
+			if (!res.ok) return [];
+			const data = await res.json();
+			return data.actors ?? [];
+		} catch {
+			return [];
+		}
+	}
+
+	function handleInput() {
+		if (debounceTimer) clearTimeout(debounceTimer);
+
+		const value = identifier.trim();
+
+		// Don't search for DIDs
+		if (value.startsWith('did:')) {
+			suggestions = [];
+			showSuggestions = false;
+			return;
+		}
+
+		if (value.length < 2) {
+			suggestions = [];
+			showSuggestions = false;
+			return;
+		}
+
+		debounceTimer = setTimeout(async () => {
+			searchLoading = true;
+			suggestions = await searchActors(value);
+			searchLoading = false;
+			showSuggestions = suggestions.length > 0;
+			selectedIndex = -1;
+		}, 300);
+	}
+
+	function selectSuggestion(actor: ActorResult) {
+		identifier = actor.handle;
+		suggestions = [];
+		showSuggestions = false;
+		selectedIndex = -1;
+		inputRef?.focus();
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (!showSuggestions || suggestions.length === 0) return;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1);
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			selectedIndex = Math.max(selectedIndex - 1, -1);
+		} else if (e.key === 'Enter' && selectedIndex >= 0) {
+			e.preventDefault();
+			selectSuggestion(suggestions[selectedIndex]);
+		} else if (e.key === 'Escape') {
+			showSuggestions = false;
+			selectedIndex = -1;
+		}
+	}
 
 	function analyse() {
 		const input = identifier.trim();
@@ -15,6 +98,12 @@
 		const encoded = encodeURIComponent(input);
 		window.location.href = `/profile/${encoded}`;
 	}
+
+	onMount(() => {
+		return () => {
+			if (debounceTimer) clearTimeout(debounceTimer);
+		};
+	});
 </script>
 
 <svelte:head>
@@ -53,13 +142,45 @@
 		</p>
 
 		<form onsubmit={(e) => { e.preventDefault(); analyse(); }} class="hero-form">
-			<input
-				type="text"
-				bind:value={identifier}
-				placeholder="ewancroft.uk or did:plc:..."
-				class="hero-input"
-				disabled={loading}
-			/>
+			<div class="input-wrapper">
+				<input
+					bind:this={inputRef}
+					type="text"
+					bind:value={identifier}
+					oninput={handleInput}
+					onkeydown={handleKeydown}
+					onfocus={() => { if (suggestions.length > 0) showSuggestions = true; }}
+					onblur={() => { setTimeout(() => { showSuggestions = false; }, 150); }}
+					placeholder="ewancroft.uk or did:plc:..."
+					class="hero-input"
+					disabled={loading}
+					autocomplete="off"
+				/>
+				{#if showSuggestions && suggestions.length > 0}
+					<ul class="suggestions" role="listbox">
+						{#each suggestions as actor, i (actor.did)}
+							<li
+								class="suggestion {selectedIndex === i ? 'selected' : ''}"
+								role="option"
+								onclick={() => selectSuggestion(actor)}
+							>
+								{#if actor.avatar}
+									<img src={actor.avatar} alt="" class="avatar" />
+								{:else}
+									<div class="avatar avatar-placeholder"></div>
+								{/if}
+								<div class="actor-info">
+									<span class="display-name">{actor.displayName ?? actor.handle}</span>
+									<span class="handle">@{actor.handle}</span>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				{#if searchLoading}
+					<div class="search-indicator"><Search size={14} class="animate-pulse" /></div>
+				{/if}
+			</div>
 			<button
 				type="submit"
 				class="btn-primary"
@@ -172,13 +293,23 @@
 		<h2>Try it</h2>
 		<p>Enter any AT Protocol handle or DID. No account needed.</p>
 		<form onsubmit={(e) => { e.preventDefault(); analyse(); }} class="cta-form">
-			<input
-				type="text"
-				bind:value={identifier}
-				placeholder="ewancroft.uk or did:plc:..."
-				class="hero-input"
-				disabled={loading}
-			/>
+			<div class="input-wrapper">
+				<input
+					type="text"
+					bind:value={identifier}
+					oninput={handleInput}
+					onkeydown={handleKeydown}
+					onfocus={() => { if (suggestions.length > 0) showSuggestions = true; }}
+					onblur={() => { setTimeout(() => { showSuggestions = false; }, 150); }}
+					placeholder="ewancroft.uk or did:plc:..."
+					class="hero-input"
+					disabled={loading}
+					autocomplete="off"
+				/>
+				{#if searchLoading}
+					<div class="search-indicator"><Search size={14} class="animate-pulse" /></div>
+				{/if}
+			</div>
 			<button
 				type="submit"
 				class="btn-primary"
@@ -283,8 +414,13 @@
 		margin: 0 auto;
 	}
 
-	.hero-input {
+	.input-wrapper {
 		flex: 1;
+		position: relative;
+	}
+
+	.hero-input {
+		width: 100%;
 		padding: 0.65rem 1rem;
 		background: var(--surface);
 		border: 1px solid var(--border);
@@ -302,6 +438,78 @@
 
 	.hero-input::placeholder {
 		color: var(--text-dim);
+	}
+
+	.search-indicator {
+		position: absolute;
+		right: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		color: var(--text-dim);
+		pointer-events: none;
+	}
+
+	/* Suggestions dropdown */
+	.suggestions {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		margin-top: 4px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		list-style: none;
+		padding: 0.25rem 0;
+		max-height: 280px;
+		overflow-y: auto;
+		z-index: 100;
+	}
+
+	.suggestion {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0.75rem;
+		cursor: pointer;
+		transition: background 0.1s;
+	}
+
+	.suggestion:hover,
+	.suggestion.selected {
+		background: var(--surface-2);
+	}
+
+	.avatar {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.avatar-placeholder {
+		background: var(--surface-2);
+	}
+
+	.actor-info {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.display-name {
+		font-size: 0.85rem;
+		color: var(--text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.handle {
+		font-size: 0.75rem;
+		color: var(--text-dim);
+		font-family: 'JetBrains Mono', monospace;
 	}
 
 	.btn-primary {
