@@ -1,19 +1,27 @@
 # AGENTS.md
 
-Guidance for agents working on Tourmaline. This repository is archived; maintained code lives in `pkgs/packages/tourmaline`.
+Guidance for the archived Tourmaline standalone app. Maintained development is in `pkgs/packages/tourmaline`; use that package for fixes/features unless the user explicitly requests a historical backport. This copy is version 0.5.0 and has materially older validation, caching, analysis, and UI than the monorepo package.
 
-## Data flow
+## Data and request flow
 
-The SvelteKit app resolves a handle/DID, discovers the user's PDS, reads `fm.teal.alpha.feed.play` records, aggregates listening history, enriches artists through public music APIs, and builds a listener profile.
+- `src/lib/server/resolve.ts` resolves handles through Slingshot, fetches `did:plc`/`did:web` documents, extracts `#atproto_pds`, and reads the profile record. The profile route returns the resolved DID/PDS to the browser.
+- The browser repeatedly calls `/api/scrobbles/[did]?pdsUrl=...&cursor=...`; the server fetches up to 25 pages of 100 `fm.teal.alpha.feed.play` records per call. The API currently trusts the caller-supplied PDS URL, so it is an SSRF boundary, not a harmless parameter.
+- Analysis modules aggregate plays into date ranges, sessions, genres, mood, diversity, obscurity, eras, phases, remarkable days, discovery, and personality/story summaries. Components and Chart.js render those derived values.
+- `/api/enrich/[did]` uses server-only `LASTFM_API_KEY` plus MusicBrainz and Deezer. Rate queues are in-memory per warm Vercel instance. Contrary to the README, this version has no SQLite/30-day response cache.
+- `/share` stores derived personality data in `sessionStorage`, performs browser OAuth, renders SVG to PNG, uploads a blob, and creates an `app.bsky.feed.post`. OAuth metadata and scope live in both `static/oauth-client-metadata.json` and `src/lib/atproto/oauth.ts`.
 
-## Rules
+## Trust and correctness boundaries
 
-- Make maintained fixes in `pkgs` unless an archival backport is explicitly requested.
-- Handles are mutable and DIDs stable. Validate DID documents, PDS service endpoints, cursors, records, and timestamps.
-- Bound pagination, concurrency, caching, and external enrichment. Partial API failure must not corrupt core play statistics.
-- Keep aggregation deterministic and separate factual counts from heuristic mood/obscurity analysis.
-- Never expose server credentials or log private tokens.
+- DIDs identify repositories; handles are mutable. Validate DID syntax/document ID, service type/ID, HTTPS PDS endpoints, redirects, DNS/private/link-local targets, response size, content type, cursor, and repository ownership before server-side fetches. Never accept an arbitrary `pdsUrl` from the browser without binding it to a server-resolved DID document.
+- Treat every Teal record field as untrusted. Missing or invalid `playedTime` currently can throw during `toISOString`; reject/sentinel malformed timestamps, require sensible artist/track shapes, bound strings/durations, and continue with an explicit invalid-record count.
+- Pagination must terminate and remain associated with one DID/PDS/snapshot. Bound pages, records, range selection, enrichment batches, queued work, chart points, and memory. Upstream error bodies may contain sensitive/huge data; do not return them verbatim to clients.
+- Keep raw counts and timestamps separate from heuristic genre/mood/personality/obscurity narratives. Calculations must be deterministic for the same normalized input, timezone policy must be explicit, and missing enrichment must not alter factual listening totals.
+- MusicBrainz requires a truthful User-Agent and roughly one request/second. Last.fm keys stay server-side. Treat upstream artist matches/images/tags as fallible; partial enrichment should remain visible rather than fabricated or cached as authoritative forever.
+- Sharing is the only write path. Keep OAuth client ID, exact redirect URIs, granular scope, blob MIME/size, and production origin aligned. Escape all card text before `{@html svgPreview}`/SVG generation, cap alt text/image size, and do not clear session state until the post succeeds.
 
-## Validation
+## Working and validation
 
-For an intentional archive change run `npm run check`, `npm run lint`, and `npm run build`. Test handle/DID lookup, pagination, duplicate/malformed plays, empty histories, API timeouts/rate limits, deterministic aggregates, SSR, and mobile rendering. Do not publish or duplicate new features here.
+- Use pnpm, not npm. For an explicitly requested archival change run `pnpm check`, `pnpm lint`, and `pnpm build`, then preview the Vercel build. There is no automated test suite; add focused unit tests for changed analysis/parsing where practical.
+- Test handle and both DID methods, hostile DID documents/PDS URLs and redirects, pagination loops/invalid cursors, malformed/duplicate/empty/large histories, timezone edges, partial/rate-limited enrichment, deterministic analysis, SSR hydration, charts, keyboard/mobile layout, OAuth denial/restore, SVG injection, blob failure, and post success.
+- If backporting from `pkgs`, compare the entire relevant implementation, manifest, OAuth metadata, env contract, tests, and version rather than copying isolated files and claiming parity.
+- Never run sharing against a real account as routine validation or expose the Last.fm key. Do not commit `.env`, OAuth sessions, listening histories, generated personality data/images, `.svelte-kit/`, Vercel output, caches, or `dist/`.
