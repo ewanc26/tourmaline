@@ -25,3 +25,15 @@ Guidance for the archived Tourmaline standalone app. Maintained development is i
 - Test handle and both DID methods, hostile DID documents/PDS URLs and redirects, pagination loops/invalid cursors, malformed/duplicate/empty/large histories, timezone edges, partial/rate-limited enrichment, deterministic analysis, SSR hydration, charts, keyboard/mobile layout, OAuth denial/restore, SVG injection, blob failure, and post success.
 - If backporting from `pkgs`, compare the entire relevant implementation, manifest, OAuth metadata, env contract, tests, and version rather than copying isolated files and claiming parity.
 - Never run sharing against a real account as routine validation or expose the Last.fm key. Do not commit `.env`, OAuth sessions, listening histories, generated personality data/images, `.svelte-kit/`, Vercel output, caches, or `dist/`.
+
+<!-- allowed-agents -->
+## Allowed agents
+
+Only **Claude** (Anthropic) and **Mistral** (Mistral AI) may be used as coding agents in this repository. This rule supersedes any earlier agent-attribution guidance in this file.
+
+- Agent-assisted commits must credit only one of those agents:
+  - `Co-Authored-By: Claude <noreply@anthropic.com>`
+  - `Co-Authored-By: Mistral Vibe <vibe@mistral.ai>`
+- Allowed agent footers are `🤖 Generated with [Claude Code](https://claude.com/claude-code)` and `🤖 Generated with [Mistral Vibe](https://mistral.ai)`.
+- Do not add `Co-Authored-By:` trailers, `Generated with` footers, author names, or committer identities for any other agent or AI tool.
+- Do not credit another agent in commit metadata.
